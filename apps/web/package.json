@@ -1,0 +1,38 @@
+{
+  "name": "hex-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build && tsc --noEmit",
+    "start": "vite start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/vite-plugin": "^1.26.1",
+    "@hex/db": "workspace:*",
+    "@hex/env": "workspace:*",
+    "@hex/game-core": "workspace:*",
+    "@hex/ui": "workspace:*",
+    "@tanstack/react-router": "^1.45.6",
+    "@tanstack/react-start": "^1.45.6",
+    "@vitejs/plugin-react": "^5.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite-plugin-env": "^1.0.1",
+    "vite-tsconfig-paths": "^6.1.1"
+  },
+  "devDependencies": {
+    "@hex/tsconfig": "workspace:*",
+    "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/router-devtools": "^1.45.6",
+    "@tanstack/router-plugin": "^1.166.2",
+    "@types/node": "^25.3.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.5.4",
+    "vite": "^7.0.0",
+    "wrangler": "^4.71.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "game-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hex/db": "workspace:*",
+    "@hex/env": "workspace:*",
+    "@hex/game-core": "workspace:*",
+    "better-auth": "^1.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240806.0",
+    "@hex/tsconfig": "workspace:*",
+    "typescript": "^5.5.4",
+    "wrangler": "^4.71.0"
+  }
+}

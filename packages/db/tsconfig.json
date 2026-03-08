@@ -1,0 +1,7 @@
+{
+  "extends": "@hex/tsconfig/cloudflare.json",
+  "compilerOptions": {
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

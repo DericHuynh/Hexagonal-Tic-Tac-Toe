@@ -1,0 +1,22 @@
+{
+  "name": "hexagonal-tic-tac-toe",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "turbo run typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.3",
+    "@cloudflare/workers-types": "^4.20260307.1",
+    "turbo": "^2.0.4",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.30.3"
+}

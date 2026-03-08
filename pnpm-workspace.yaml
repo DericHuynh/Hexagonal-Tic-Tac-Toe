@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
+ignoredBuiltDependencies:
+  - msw
+
+onlyBuiltDependencies:
+  - '@biomejs/biome'
+  - '@prisma/engines'
+  - esbuild
+  - prisma
+  - sharp
+  - workerd

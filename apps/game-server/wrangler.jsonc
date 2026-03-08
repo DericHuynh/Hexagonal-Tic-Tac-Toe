@@ -1,0 +1,8 @@
+{
+	"name": "hex-ttt-game-server",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-03-08",
+	"observability": {
+		"enabled": true,
+	},
+}
