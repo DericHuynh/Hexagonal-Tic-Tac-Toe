@@ -6,10 +6,10 @@
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": [
-        "./worker-configuration.d.ts",
-        "node",
-        "vite/client",
-        "@cloudflare/vitest-pool-workers"
+      "./worker-configuration.d.ts",
+      "node",
+      "vite/client",
+      "@cloudflare/vitest-pool-workers",
     ],
 
     /* Bundler mode */
@@ -27,7 +27,8 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
-    }
-  }
+      "@/*": ["./src/*"],
+      "@hex/game-core": ["./packages/game-core/src/index.ts"],
+    },
+  },
 }
