@@ -1,122 +1,121 @@
-# AI Agent Instructions (AGENTS.md)
+# AGENTS.md
 
-Welcome. You are assisting in the development of a Hexagonal Tic Tac Toe multiplayer game. The game works as follows:
-- The grid is a hexagon of hexagons that is 20 hexagons in radius, you can only place hexagons within 7 hexagons of the enemy hexagons.
-- You win by getting 6 in a row
-- Draw if there's no hexagons left to place and there's no winner.
-- First player starts by placing one X, then the other player places 2 O's, then they alternate placing 2 each per turn.
+## Project Overview
 
- Read this document carefully before suggesting code, writing tests, or modifying configurations. 
+TanStack Start full-stack React app running on Cloudflare Workers with Durable Objects and D1 (SQLite). Uses Drizzle ORM for both databases, WebSocket Hibernation API for real-time sync, and Tailwind CSS v4 for styling.
 
-## 🏗️ Architecture & Tech Stack Overview
+## Build & Run Commands
 
-This is a modern, edge-native PNPM Turborepo. It heavily utilizes Cloudflare's ecosystem and the latest React paradigms.
+```bash
+pnpm dev              # Start dev server on port 3000
+pnpm build            # Production build (Vite)
+pnpm test             # Run all tests (vitest run)
+pnpm deploy           # Build + wrangler deploy
+pnpm tsc --noEmit     # Type check (no dedicated script)
+```
 
-### **Core Stack**
-- **Monorepo:** Turborepo + PNPM Workspaces
-- **Frontend / SSR:** TanStack Start (React 19) + TanStack Router
-- **Styling:** Tailwind CSS **v4** + Shadcn UI through shadcn@rc (not shadcn@latest)
-- **Real-Time Backend:** Cloudflare Workers + Durable Objects (DO)
-- **Database & Auth:** Cloudflare D1 + Drizzle ORM + BetterAuth
-- **Testing:** Vitest (Unit) + Playwright (E2E)
-- **Tooling:** Biome (Formatting/Linting)
-- **Environment:** T3 Env (Type-safe environment variables)
+### Running a Single Test
 
----
+```bash
+pnpm vitest run test/durable-object.test.ts       # Single file
+pnpm vitest run -t "increments the counter"        # By name pattern
+```
 
-## 📂 Repository Structure & Responsibilities
+### Database Commands
 
-The codebase is split into the "2-App Pattern" to separate Server-Side Rendering from Stateful WebSocket management. 
+```bash
+pnpm db:generate      # Generate D1 migrations (drizzle-kit)
+pnpm db:generate:do   # Generate Durable Object SQLite migrations
+pnpm db:migrate       # Apply D1 migrations via wrangler
+pnpm cf-typegen       # Regenerate worker-configuration.d.ts
+```
 
-### Apps (`/apps`)
-1. **`apps/web` (TanStack Start App)**
-   - Deployed to Cloudflare Pages.
-   - Handles SSR, Routing, Authentication (BetterAuth API routes), and UI delivery.
-   - Communicates with D1 via standard REST/RPC and connects to `game-server` via WebSockets.
-   - Uses Vite (`app.config.ts` via Vinxi) and Tailwind v4.
+## Testing
 
-2. **`apps/game-server` (Cloudflare Worker + Durable Objects)**
-   - Deployed as a standard Cloudflare Worker.
-   - Purely responsible for Game State and WebSockets.
-   - Holds the `GameSession` Durable Object class.
-   - DO NOT put UI or HTML rendering logic here.
+- Vitest with `@cloudflare/vitest-pool-workers` -- tests run inside Workers runtime via miniflare
+- Config: `vitest.config.ts` (separate from `vite.config.ts`). Tests in `test/*.test.ts`
+- Bindings available via `import { env } from 'cloudflare:test'`
+- No lint or format tools configured (no ESLint, Prettier, or Biome)
 
-### Packages (`/packages`)
-1. **`packages/game-core` (The Source of Truth)**
-   - Pure TypeScript. No React, no Cloudflare imports.
-   - Contains: Hexagonal grid math, win-condition validation algorithms, and Zod schemas for WebSocket payloads.
-   - Heavily unit-tested using Vitest. Both `apps/web` and `apps/game-server` import this package.
+## Architecture
 
-2. **`packages/db` (Database Layer)**
-   - Contains Drizzle schema (`src/schema.ts`), D1 migration files, and BetterAuth database configurations.
-   - Shared between `web` (for leaderboards/auth) and `game-server` (for saving match results).
+### Runtime & Entry Points
 
-3. **`packages/ui` (Shared Component Library)**
-   - Contains Shadcn UI primitives and `react-hexgrid` wrapper components.
-   - All `react-hexgrid` components must have `"use client"` directives as they manipulate the DOM heavily.
-   - Configured with Storybook for isolated component testing.
+- **Worker entry:** `src/server.ts` -- `createServerEntry` from TanStack Start, intercepts WebSocket requests, delegates the rest to TanStack
+- **Durable Object:** `src/durable-object.ts` -- `MyDurableObject` class with RPC methods and WebSocket Hibernation API
+- **Router factory:** `src/router.tsx` -- creates TanStack Router instance
+- **Route tree:** `src/routeTree.gen.ts` -- auto-generated, DO NOT edit manually
 
----
+### Two Database Systems
 
-## 🚨 Strict Coding Guidelines & Rules for AI
+1. **D1 (shared SQLite):** Schema in `src/db/schema.ts`, access via `getDb()` in `src/db/index.ts`, migrations in `drizzle/migrations/`
+2. **Durable Object SQLite (per-instance):** Schema in `src/db/do-schema.ts`, migrations in `drizzle/do-migrations/`, auto-applied on DO construction
 
-### 1. Tailwind CSS v4 Rules
-- **Do not create or look for a `tailwind.config.js`.** Tailwind v4 uses standard CSS variables and a Vite plugin (`@tailwindcss/vite`).
-- All theme customizations must be done inside `apps/web/app.css` using the `@theme` directive.
-- Example: `@theme { --color-primary: #ff0000; }`.
+### Cloudflare Bindings
 
-### 2. TanStack Start & Router
-- Use file-based routing inside `apps/web/app/routes/`.
-- API routes (like BetterAuth endpoints) go inside `apps/web/app/routes/api/`.
-- **Server Functions (`createServerFn`):** Use TanStack Start's `createServerFn` for RPC-style communication between the client and server instead of creating separate API routes for every action. This provides end-to-end type safety.
-- Access Cloudflare context (env bindings) inside `createServerFn` via the injected server context, keeping in mind that functions executed via RPC will run on Cloudflare Pages.
-- Use loaders for server-side state fetching before rendering. Do not rely heavily on standard React `useEffect` for data fetching.
+Access via `import { env } from 'cloudflare:workers'` (NOT `getCloudflareContext()`):
+- `env.DB` -- D1 database
+- `env.MY_DURABLE_OBJECT` -- DurableObjectNamespace
 
-### 3. Hexagonal Grid & Game Logic
-- We are using an Axial/Cube coordinate system (q, r, s) for the Hex Grid.
-- Mathematical validation (e.g., checking if 4 hexes align) must ONLY be written inside `packages/game-core`.
-- If a user attempts a move in `apps/web`, optimistic UI updates should use `packages/game-core`. The `apps/game-server` Durable Object must then independently validate the move using the same package before broadcasting the state.
+### Key Patterns
 
-### 4. Cloudflare Durable Objects (WebSockets)
-- Use ES Module syntax for the Worker (`export default { fetch(...) }`).
-- The Durable Object (`GameSession.ts`) handles WebSocket upgrades via the Hibernation API (if possible) or standard DO WebSocket handling.
-- Ensure all WebSocket messages strictly conform to the Zod schemas defined in `packages/game-core`.
+- **Server functions:** Defined with `createServerFn()` from `@tanstack/react-start`, placed at the top of route files before the route definition
+- **DO RPC:** Server functions call DO methods directly via `env.MY_DURABLE_OBJECT.getByName(id).methodName()`
+- **WebSocket:** Upgrade requests intercepted in `src/server.ts` via regex, forwarded to DO `fetch()`
+- **Optimistic UI:** Client updates state immediately, reverts on error (see `src/routes/counter/$id.tsx`)
+- **DO migrations:** Run in `blockConcurrencyWhile` during DO construction
 
-### 5. Package Management
-- Always use `pnpm`. 
-- When adding a dependency to a specific workspace, use the filter flag. Example: `pnpm --filter web add lucide-react`.
-- Internal package imports should use workspace formatting (e.g., `"@hex/game-core": "workspace:*"`).
+## Code Style Guidelines
 
-### 6. Testing Strategy
-- If you write math, write a Vitest test in `packages/game-core/tests`.
-- If you change UI, consider a Storybook entry in `packages/ui`.
-- If you modify how WebSockets sync state, write a Playwright E2E test in `tests/e2e/multiplayer.spec.ts` that spins up two browser contexts to verify synchronization.
+### TypeScript
 
-### 7. Linting & Formatting (Biome)
-- Use **Biome** for all linting and formatting. Do not use Prettier or ESLint.
-- The `biome.json` file at the root of the monorepo dictates the formatting rules. Ensure your editor is configured to format on save using Biome.
+- **Strict mode** enabled with `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`
+- Target ES2022, module ESNext, bundler module resolution
+- Use `type` keyword for type-only imports when applicable
+- No formatter configured -- follow the style of the file you're editing (2-space indent in src, tabs in tests, single quotes, trailing commas, semicolons)
 
----
-## ⚡ Infrastructure & Binding Management (Crucial)
+### Imports
 
-### 1. Cloudflare Bindings vs. Environment Variables
-- **Do not use `process.env`** inside Cloudflare-deployed code (`apps/web` or `apps/game-server`). 
-- Cloudflare provides environment variables through the `env` object passed into request handlers (`fetch`, `loaders`, `actions`, `createServerFn`).
-- **T3 Env:** We use `@t3-oss/env-core` (T3 Env) to define and validate our bindings and environment variables.
-- **Always** use the validated output from T3 Env by passing the Cloudflare `env` object into a type-safe parser rather than accessing raw strings.
-- If you need a new binding, add it to the `wrangler.toml` in the respective app first, then update the app's T3 Env schema to ensure type safety.
+- Path alias `@/*` maps to `./src/*` (e.g., `import { getDb } from '@/db'`)
+- Order: external packages > `cloudflare:*` imports > internal `@/` imports > relative imports
+- Named exports preferred; default exports only for React components
 
-### 2. Durable Object (DO) Boundaries
-- The `apps/game-server` is the **only** place where `DurableObject` classes are defined.
-- The `apps/web` app communicates with these objects solely through WebSocket connections or standard `fetch` requests (for signaling). 
-- If you are writing code in `apps/web`, do not attempt to import the `GameSession` class directly.
+### Naming Conventions
 
-### 3. TypeScript Runtime Types
-- We use `@cloudflare/workers-types` globally. 
-- If you encounter "Cannot find name X" (e.g., `D1Database`, `DurableObjectNamespace`), verify that `packages/tsconfig/base.json` includes `["@cloudflare/workers-types/2023-07-01"]` in `compilerOptions.types`.
-- Never install `dotenv` or similar Node.js-based env loaders.
+- **Files:** kebab-case (`do-schema.ts`, `durable-object.ts`)
+- **Route files:** TanStack Start conventions -- `$param.tsx`, `__root.tsx`, dot-separated nested paths (`start.ssr.data-only.tsx`)
+- **Components:** PascalCase (`CounterPage`, `Header`)
+- **Server functions:** camelCase (`getCounterValue`, `incrementCounter`)
+- **DB tables/columns:** snake_case in SQL, camelCase in Drizzle schema
+- **Constants:** UPPER_SNAKE_CASE (`WS_COUNTER_PATTERN`, `DEFAULT_SONGS`)
+- **Private DO methods:** underscore prefix (`_getOrCreateCounter`, `_broadcast`)
 
-### 4. Database Access Pattern
-- **`apps/web`**: Uses Drizzle ORM bound to the D1 `DB` binding. Use this for Auth (BetterAuth) and Leaderboard queries.
-- **`apps/game-server`**: Uses Drizzle ORM (or raw D1 SQL) bound to the `DB` binding inside the Durable Object to persist finished game records.
-- Both use the shared schema from `packages/db`.
+### TanStack Start & React Patterns
+
+- **Prefer server functions over API routes.** Use `createServerFn()` for data fetching and mutations. API routes (`server.handlers`) should only be used when you need a raw HTTP endpoint (e.g., for external consumers or webhooks).
+- **Avoid `useEffect` for data fetching.** Use route `loader` functions with server functions instead. `useEffect` is acceptable only for browser-only side effects like WebSocket connections or DOM measurements.
+- Route components are non-exported named functions; `export const Route` is the file route definition
+- Use `Route.useLoaderData()` and `Route.useParams()` for route data access
+- Functional components only, Tailwind CSS v4 utility classes for all styling
+
+### Error Handling
+
+- Optimistic updates with try/catch and rollback on failure
+- Empty `catch` blocks acceptable for non-critical errors but must include a comment explaining why
+- DO WebSocket errors handled gracefully -- connection status tracked in component state
+
+### Drizzle ORM
+
+- Schema files export table definitions directly (`export const songs = sqliteTable(...)`)
+- Functional column builders: `integer()`, `text()` (not `integer("colname")`)
+- Chain modifiers: `.primaryKey({ autoIncrement: true })`, `.notNull()`, `.default(0)`
+- D1 access always through `getDb()` helper, never raw `env.DB`
+
+### Durable Objects
+
+- Extend `DurableObject<Env>` from `cloudflare:workers`
+- Always call `super(ctx, env)` in constructor
+- Run migrations in `ctx.blockConcurrencyWhile()` during construction
+- Public methods are RPC-callable; prefix private helpers with underscore
+- WebSocket handlers use the Hibernation API (`ctx.acceptWebSocket`, `webSocketMessage`, `webSocketClose`)
+- Export DO class from `src/server.ts` for wrangler to discover
