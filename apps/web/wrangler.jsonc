@@ -1,7 +1,3 @@
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "hex-tic-tac-toe",
@@ -33,7 +29,7 @@
     {
       "binding": "DB",
       "database_name": "hex-tic-tac-toe-db",
-      "database_id": "<YOUR_D1_DATABASE_ID>",
+      "database_id": "232462d1-709f-443d-8e8c-8e4ab5b70e58",
       "migrations_dir": "./drizzle/migrations",
     },
   ],

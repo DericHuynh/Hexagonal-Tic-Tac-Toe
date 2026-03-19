@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { getDb } from '@/db'
-import { songs } from '@/db/schema'
+import { getDb } from '@hex/db'
+import { songs } from '@hex/db/schema'
 
 export const Route = createFileRoute('/demo/api/songs')({
   server: {

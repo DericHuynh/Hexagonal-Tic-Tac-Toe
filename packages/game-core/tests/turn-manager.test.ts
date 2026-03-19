@@ -398,7 +398,7 @@ describe('simulatePieces', () => {
 // turnStateAfterMoveCount
 // ---------------------------------------------------------------------------
 describe('turnStateAfterMoveCount', () => {
-  it('moveCount 0 → X opening', () => {
+  it('moveCount 0 -> X opening', () => {
     const state = turnStateAfterMoveCount(0)
     expect(state).toMatchObject({
       currentTurn: 'X',
@@ -408,7 +408,9 @@ describe('turnStateAfterMoveCount', () => {
     })
   })
 
-  it('moveCount 1 → O, 1 placed of 2', () => {
+
+  it('moveCount 1 -> O, 1 placed of 2', () => {
+
     const state = turnStateAfterMoveCount(1)
     expect(state).toMatchObject({
       currentTurn: 'O',
@@ -418,7 +420,9 @@ describe('turnStateAfterMoveCount', () => {
     })
   })
 
-  it('moveCount 2 → O, 2 placed → X turn starts', () => {
+
+  it('moveCount 2 -> O, 2 placed -> X turn starts', () => {
+
     const state = turnStateAfterMoveCount(2)
     expect(state).toMatchObject({
       currentTurn: 'O',
@@ -428,7 +432,9 @@ describe('turnStateAfterMoveCount', () => {
     })
   })
 
-  it('moveCount 3 → X, 1 placed of 2', () => {
+
+  it('moveCount 3 -> X, 1 placed of 2', () => {
+
     const state = turnStateAfterMoveCount(3)
     expect(state).toMatchObject({
       currentTurn: 'X',
@@ -438,7 +444,9 @@ describe('turnStateAfterMoveCount', () => {
     })
   })
 
-  it('moveCount 4 → X, 2 placed → O turn starts', () => {
+
+  it('moveCount 4 -> X, 2 placed -> O turn starts', () => {
+
     const state = turnStateAfterMoveCount(4)
     expect(state).toMatchObject({
       currentTurn: 'X',
@@ -448,7 +456,9 @@ describe('turnStateAfterMoveCount', () => {
     })
   })
 
-  it('moveCount 5 → O, 1 placed of 2', () => {
+
+  it('moveCount 5 -> O, 1 placed of 2', () => {
+
     const state = turnStateAfterMoveCount(5)
     expect(state).toMatchObject({
       currentTurn: 'O',
@@ -458,7 +468,9 @@ describe('turnStateAfterMoveCount', () => {
     })
   })
 
-  it('moveCount 6 → O, 2 placed → X turn starts', () => {
+
+  it('moveCount 6 -> O, 2 placed -> X turn starts', () => {
+
     const state = turnStateAfterMoveCount(6)
     expect(state).toMatchObject({
       currentTurn: 'O',

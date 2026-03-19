@@ -1,9 +1,29 @@
+
+
 import { DurableObject } from "cloudflare:workers";
+
 import { drizzle, DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-import { migrate } from "drizzle-orm/durable-sqlite/migrator";
-import { eq } from "drizzle-orm";
-import migrations from "../drizzle/do-migrations";
-import { gameState, cells, moves } from "./db/do-schema";
+
+
+
+
+
+
+import { eq, sql } from "drizzle-orm";
+
+
+
+
+
+
+
+
+
+
+
+
+import { gameState, cells, moves } from "@hex/db/do-schema";
+
 import {
   createBoard,
   forceSetCell,
@@ -59,9 +79,85 @@ export class GameSession extends DurableObject<Env> {
     this.storage = ctx.storage;
     this.db = drizzle(this.storage, { logger: false });
 
+
     ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, migrations);
+
+
+      await this.db.run(sql.raw(`
+        CREATE TABLE IF NOT EXISTS game_state (
+
+          id INTEGER PRIMARY KEY DEFAULT 1 NOT NULL,
+
+          status TEXT DEFAULT 'waiting' NOT NULL,
+
+          player_x_id TEXT,
+
+          player_o_id TEXT,
+
+          current_turn TEXT DEFAULT 'X' NOT NULL,
+
+          pieces_placed_this_turn INTEGER DEFAULT 0 NOT NULL,
+
+          move_count INTEGER DEFAULT 0 NOT NULL,
+
+          winner TEXT,
+
+          win_reason TEXT,
+
+          win_line TEXT,
+
+          started_at INTEGER,
+
+          updated_at INTEGER NOT NULL
+
+        )
+
+      `));
+
+
+      await this.db.run(sql.raw(`
+
+        CREATE TABLE IF NOT EXISTS cells (
+
+          q INTEGER NOT NULL,
+
+          r INTEGER NOT NULL,
+
+          player TEXT NOT NULL,
+
+          placed_at INTEGER NOT NULL,
+
+          move_index INTEGER NOT NULL,
+
+          PRIMARY KEY (q, r)
+
+        )
+
+      `));
+
+
+      await this.db.run(sql.raw(`
+
+        CREATE TABLE IF NOT EXISTS moves (
+
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+
+          player TEXT NOT NULL,
+
+          q INTEGER NOT NULL,
+
+          r INTEGER NOT NULL,
+
+          move_index INTEGER NOT NULL,
+
+          timestamp INTEGER NOT NULL
+
+        )
+
+      `));
+
     });
+
   }
 
   // =========================================================================

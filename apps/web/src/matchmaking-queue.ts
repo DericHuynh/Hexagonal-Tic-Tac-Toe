@@ -1,13 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
 
+
 import { drizzle, DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
 
-import { migrate } from "drizzle-orm/durable-sqlite/migrator";
+
+
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
-import { eq } from "drizzle-orm";
 
-import doMigrations from "../drizzle/do-migrations";
+
+import { eq, sql } from "drizzle-orm";
+
+
 import {
   findMatches,
   assignRoles,
@@ -50,9 +54,43 @@ export class MatchmakingQueue extends DurableObject<Env> {
 
     this.db = drizzle(this.storage, { logger: false });
 
+
     ctx.blockConcurrencyWhile(async () => {
-      await migrate(this.db, doMigrations);
+
+      // Create tables if they don't exist
+
+      await this.db.run(sql.raw(`
+
+        CREATE TABLE IF NOT EXISTS queue_entries (
+
+          user_id TEXT PRIMARY KEY NOT NULL,
+
+          elo INTEGER NOT NULL,
+
+          game_mode TEXT NOT NULL DEFAULT 'standard',
+
+          enqueued_at INTEGER NOT NULL
+
+        )
+
+      `));
+
+      await this.db.run(sql.raw(`
+
+        CREATE TABLE IF NOT EXISTS match_results (
+
+          user_id TEXT PRIMARY KEY NOT NULL,
+
+          game_id TEXT NOT NULL,
+
+          matched_at INTEGER NOT NULL
+
+        )
+
+      `));
+
     });
+
   }
 
   // =========================================================================

@@ -1,6 +1,9 @@
-import { env } from "cloudflare:test";
+import { env, exports } from "cloudflare:workers";
 import { describe, it, expect } from "vitest";
-import { WS_GAME_PATTERN, WS_MATCHMAKING_PATTERN } from "../src/server";
+import {
+  WS_GAME_PATTERN,
+  WS_MATCHMAKING_PATTERN,
+} from "../apps/web/src/server.ts";
 
 describe("WebSocket Patterns", () => {
   describe("WS_GAME_PATTERN", () => {

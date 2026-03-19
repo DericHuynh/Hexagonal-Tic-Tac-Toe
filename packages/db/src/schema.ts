@@ -113,7 +113,7 @@ export const lessonProgress = sqliteTable("lesson_progress", {
   id: integer().primaryKey({ autoIncrement: true }),
   userId: text("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => lessons.id),
   lessonId: text("lesson_id")
     .notNull()
     .references(() => lessons.id),
@@ -121,4 +121,17 @@ export const lessonProgress = sqliteTable("lesson_progress", {
   score: integer(),
   attempts: integer().notNull().default(0),
   completedAt: integer("completed_at"),
+});
+
+// ---------------------------------------------------------------------------
+// Demo: Punk Songs (for testing API routes)
+// ---------------------------------------------------------------------------
+
+export const songs = sqliteTable("songs", {
+  id: integer().primaryKey({ autoIncrement: true }),
+  name: text().notNull(),
+  artist: text().notNull(),
+  createdAt: integer("created_at")
+    .notNull()
+    .$defaultFn(() => Math.floor(Date.now() / 1000)),
 });

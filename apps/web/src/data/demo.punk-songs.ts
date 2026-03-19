@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getDb } from '@/db'
-import { songs } from '@/db/schema'
+import { getDb } from '@hex/db'
+import { songs } from '@hex/db/schema'
 import { count } from 'drizzle-orm'
 
 const DEFAULT_SONGS = [

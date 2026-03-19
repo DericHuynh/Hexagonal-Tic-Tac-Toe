@@ -356,7 +356,9 @@ describe('pixelToAxial / hexRound', () => {
     expect(coord).toEqual({ q: 0, r: 0 })
   })
 
-  it('roundtrips axial → pixel → axial for origin', () => {
+
+  it('roundtrips axial to pixel to axial for origin', () => {
+
     const size = 30
     const original = { q: 0, r: 0 }
     const pixel = axialToPixel(original, size)
@@ -364,7 +366,9 @@ describe('pixelToAxial / hexRound', () => {
     expect(recovered).toEqual(original)
   })
 
-  it('roundtrips axial → pixel → axial for (3, -1)', () => {
+
+  it('roundtrips axial to pixel to axial for (3, -1)', () => {
+
     const size = 30
     const original = { q: 3, r: -1 }
     const pixel = axialToPixel(original, size)
