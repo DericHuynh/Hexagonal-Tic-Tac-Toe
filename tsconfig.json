@@ -8,7 +8,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -24,6 +23,11 @@
     "composite": true,
     "outDir": "./dist",
   },
-  "include": [],
-  "exclude": ["node_modules", "dist"],
+  "files": [],
+  "references": [
+    { "path": "./apps/web" },
+    { "path": "./packages/db" },
+    { "path": "./packages/game-core" },
+    { "path": "./packages/ui" },
+  ],
 }
