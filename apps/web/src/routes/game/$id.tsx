@@ -27,7 +27,6 @@ const joinGameFn = createServerFn({ method: "POST" })
     return { ok: res.ok, error: res.error } as { ok: boolean; error?: string };
   });
 
-
 export const Route = createFileRoute("/game/$id")({
   component: GamePage,
   loader: async ({ params }) => {

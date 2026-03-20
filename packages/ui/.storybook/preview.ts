@@ -1,4 +1,5 @@
 import type { Preview, ReactRenderer } from "@storybook/react-vite";
+// @ts-ignore
 import "../src/styles.css"; // ← this is the critical missing import
 import { withThemeByClassName } from "@storybook/addon-themes";
 

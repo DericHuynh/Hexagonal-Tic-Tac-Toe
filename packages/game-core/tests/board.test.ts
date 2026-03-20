@@ -211,7 +211,10 @@ describe("isBoardFull", () => {
   it("returns false for partially filled board", () => {
     const board = createBoard();
     for (let i = 0; i < 100; i++) {
-      board.set(axialToKey({ q: i % 10, r: Math.floor(i / 10) }), (i % 2 === 0 ? "X" : "O") as Player);
+      board.set(
+        axialToKey({ q: i % 10, r: Math.floor(i / 10) }),
+        (i % 2 === 0 ? "X" : "O") as Player,
+      );
     }
     expect(isBoardFull(board)).toBe(false);
   });

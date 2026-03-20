@@ -338,7 +338,12 @@ export class GameSession extends DurableObject<Env> {
             })
             .where(eq(gameState.id, 1));
           const state = await this._buildGameState();
-          this._broadcast({ type: "game_over", winner: null, reason: "draw", winLine: state.winLine ?? null });
+          this._broadcast({
+            type: "game_over",
+            winner: null,
+            reason: "draw",
+            winLine: state.winLine ?? null,
+          });
         } else {
           // Rejected: notify offerer
           for (const other of this.ctx.getWebSockets()) {
