@@ -110,19 +110,25 @@ export function render(
   // Viewport origin: the pixel that corresponds to hex (0,0)
   const origin = { x: cx - centerX * zoom, y: cy - centerY * zoom };
 
-  // Determine visible cells
+  // Determine visible cells — compute axial coord under screen center to handle panning
   const margin = 2;
+  // The screen center in pixel space maps to axial: (centerX, centerY) in hex-space units
+  // We need to find which axial cell is at the screen center, then iterate around it.
+  const screenCenterAxial = pixelToAxial({ x: cx, y: cy }, zoom, origin);
   const visibleR = Math.ceil(Math.max(width, height) / 2 / zoom) + margin;
-  const drawRadius = Math.min(boardRadius, visibleR);
 
-  // All cells in a hex bounding box around origin
+  // Iterate a band of cells around the screen-center axial coord
+  const cq = screenCenterAxial.q;
+  const cr = screenCenterAxial.r;
   const toDraw: AxialCoord[] = [];
-  for (let q = -drawRadius; q <= drawRadius; q++) {
+  for (let dq = -visibleR; dq <= visibleR; dq++) {
+    const q = cq + dq;
     for (
-      let r = Math.max(-drawRadius, -q - drawRadius);
-      r <= Math.min(drawRadius, -q + drawRadius);
-      r++
+      let dr = Math.max(-visibleR, -dq - visibleR);
+      dr <= Math.min(visibleR, -dq + visibleR);
+      dr++
     ) {
+      const r = cr + dr;
       if (
         Math.abs(q) <= boardRadius &&
         Math.abs(r) <= boardRadius &&

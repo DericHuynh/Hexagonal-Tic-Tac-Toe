@@ -46,7 +46,7 @@ export function GameHUD({
   };
 
   return (
-    <div className="absolute inset-x-0 top-0 flex flex-col gap-2 pointer-events-none">
+    <div className="absolute inset-0 flex flex-col pointer-events-none">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2 bg-slate-900/80 backdrop-blur border-b border-slate-700">
         {/* Player X */}

@@ -3,7 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@hex/
 import { Badge } from "@hex/ui/badge";
 import { Trophy, Medal, Target, TrendingUp, Users } from "lucide-react";
 
-export const Route = createFileRoute("/leaderboard")({ component: LeaderboardPage });
+export const Route = createFileRoute("/leaderboard")({
+  component: LeaderboardPage,
+  loader: () => getLeaderboard(),
+});
 
 async function getLeaderboard() {
   // In a real implementation, this would fetch from D1 database
@@ -182,7 +185,7 @@ function getRankIcon(rank: number) {
 }
 
 function LeaderboardPage() {
-  const leaderboard = getLeaderboard();
+  const leaderboard = Route.useLoaderData();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">

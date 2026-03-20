@@ -1,4 +1,30 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { createServerFn } from "@tanstack/react-start";
+import { rpcJoinQueue, rpcCheckQueueStatus, rpcLeaveQueue } from "../lib/server-rpc.server";
+
+const joinQueueFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { userId: string; elo: number; gameMode: string }) => d)
+  .handler(async ({ data }) => {
+    const res = await rpcJoinQueue(data.userId, data.elo, data.gameMode);
+    return { ok: res.ok, gameId: res.gameId } as { ok: boolean; gameId?: string };
+  });
+
+const statusQueueFn = createServerFn({ method: "GET" })
+  .inputValidator((userId: string) => userId)
+  .handler(async ({ data: userId }) => {
+    const res = await rpcCheckQueueStatus(userId);
+    return { status: res.status, gameId: res.gameId } as {
+      status: "waiting" | "matched";
+      gameId?: string;
+    };
+  });
+
+const leaveQueueFn = createServerFn({ method: "POST" })
+  .inputValidator((userId: string) => userId)
+  .handler(async ({ data: userId }) => {
+    await rpcLeaveQueue(userId);
+    return { ok: true };
+  });
 
 interface MatchmakingState {
   status: "idle" | "queued" | "matched";
@@ -27,16 +53,14 @@ export function useMatchmaking(userId: string) {
   const joinQueue = useCallback(async () => {
     setState({ status: "queued", gameId: null, error: null, waitSeconds: 0 });
 
-    // Call server function to join queue
     try {
-      const res = await fetch("/api/matchmaking/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, elo: 1200, gameMode: "standard" }),
-      });
-      const data = (await res.json()) as { ok: boolean; gameId?: string; error?: string };
+      const data = (await joinQueueFn({ data: { userId, elo: 1200, gameMode: "standard" } })) as {
+        ok: boolean;
+        gameId?: string;
+        error?: string;
+      };
       if (!data.ok) {
-        setState((s) => ({ ...s, status: "idle", error: data.error ?? "Failed to join queue" }));
+        setState((s) => ({ ...s, status: "idle", error: "Failed to join queue" }));
         return;
       }
       if (data.gameId) {
@@ -48,15 +72,13 @@ export function useMatchmaking(userId: string) {
       return;
     }
 
-    // Start polling
     timerRef.current = setInterval(() => {
       setState((s) => ({ ...s, waitSeconds: s.waitSeconds + 1 }));
     }, 1000);
 
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`/api/matchmaking/status?userId=${encodeURIComponent(userId)}`);
-        const data = (await res.json()) as { status: string; gameId?: string };
+        const data = (await statusQueueFn({ data: userId })) as { status: string; gameId?: string };
         if (data.status === "matched" && data.gameId) {
           stopPolling();
           setState({ status: "matched", gameId: data.gameId, error: null, waitSeconds: 0 });
@@ -71,11 +93,7 @@ export function useMatchmaking(userId: string) {
     stopPolling();
     setState({ status: "idle", gameId: null, error: null, waitSeconds: 0 });
     try {
-      await fetch("/api/matchmaking/leave", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
+      await leaveQueueFn({ data: userId });
     } catch {
       // ignore
     }

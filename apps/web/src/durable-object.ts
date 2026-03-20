@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import doMigrations from "../drizzle/do-migrations";
 import { gameState, cells, moves } from "./db/do-schema";
 import { isCellEmpty, isBoardFull, boardFromArray, axialToKey } from "@hex/game-core";
-import { placePiece, getPiecesRemaining, restoreTurnState } from "@hex/game-core";
+import { placePiece, restoreTurnState } from "@hex/game-core";
 import { checkWinFromCell } from "@hex/game-core";
 import type {
   Player,
@@ -73,7 +73,8 @@ export class GameSession extends DurableObject<Env> {
       gameId: this.ctx.id.toString(),
       status: (gs.status ?? "waiting") as any,
       boardRadius: BOARD_RADIUS,
-      board,
+      // Maps serialize as {} over JSON; convert to plain object so clients can reconstruct
+      board: Object.fromEntries(board) as unknown as Board,
       playerXId: gs.playerXId ?? null,
       playerOId: gs.playerOId ?? null,
       currentTurn: (gs.currentTurn ?? "X") as Player,
@@ -208,23 +209,24 @@ export class GameSession extends DurableObject<Env> {
       })
       .where(eq(gameState.id, 1));
 
-    const updatedState = await this._buildGameState();
-
-    // Broadcast move
-    this._broadcast({ type: "move", q, r, player: currentPlayer, moveIndex, state: updatedState });
+    // Broadcast delta move (no full board — client applies the cell to its local Map)
+    this._broadcast({
+      type: "move",
+      q,
+      r,
+      player: currentPlayer,
+      moveIndex,
+      currentTurn: nextTurnState.currentTurn,
+      piecesPlacedThisTurn: nextTurnState.piecesPlacedThisTurn,
+      moveCount: newMoveCount,
+    });
 
     if (newStatus === "finished") {
       this._broadcast({
         type: "game_over",
         winner: winner as Player | null,
         reason: winReason! as WinReason,
-        state: updatedState,
-      });
-    } else {
-      this._broadcast({
-        type: "turn_change",
-        currentTurn: nextTurnState.currentTurn,
-        piecesRemaining: getPiecesRemaining(nextTurnState),
+        winLine: winLine ?? null,
       });
     }
 
@@ -252,8 +254,7 @@ export class GameSession extends DurableObject<Env> {
       })
       .where(eq(gameState.id, 1));
 
-    const updatedState = await this._buildGameState();
-    this._broadcast({ type: "game_over", winner, reason: "resignation", state: updatedState });
+    this._broadcast({ type: "game_over", winner, reason: "resignation", winLine: null });
 
     return { ok: true };
   }
@@ -337,7 +338,7 @@ export class GameSession extends DurableObject<Env> {
             })
             .where(eq(gameState.id, 1));
           const state = await this._buildGameState();
-          this._broadcast({ type: "game_over", winner: null, reason: "draw", state });
+          this._broadcast({ type: "game_over", winner: null, reason: "draw", winLine: state.winLine ?? null });
         } else {
           // Rejected: notify offerer
           for (const other of this.ctx.getWebSockets()) {

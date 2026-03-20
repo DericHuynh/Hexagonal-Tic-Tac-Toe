@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { GameState, ServerMessage, ClientMessage } from "@hex/game-core";
+import type { GameState, ServerMessage, ClientMessage, Player } from "@hex/game-core";
+
+/** JSON turns Map -> plain object. This restores the board back to Map<string, Player> */
+function deserializeGameState(state: GameState): GameState {
+  const rawBoard = state.board as unknown as Record<string, Player>;
+  const board = new Map<string, Player>(Object.entries(rawBoard));
+  return { ...state, board };
+}
 
 export interface UseGameStateReturn {
   gameState: GameState | null;
@@ -18,7 +25,7 @@ export function useGameState(gameId: string, userId: string): UseGameStateReturn
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    if (!gameId || !userId) return;
+    if (!gameId || !userId || userId === "guest") return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${protocol}//${window.location.host}/game/${gameId}/ws?userId=${encodeURIComponent(userId)}`;
@@ -34,24 +41,35 @@ export function useGameState(gameId: string, userId: string): UseGameStateReturn
         const msg = JSON.parse(event.data as string) as ServerMessage;
         switch (msg.type) {
           case "sync":
-            setGameState(msg.state);
+            setGameState(deserializeGameState(msg.state));
             break;
           case "move":
-            setGameState(msg.state);
+            // Delta update: merge new cell into existing board Map
+            setGameState((prev) => {
+              if (!prev) return prev;
+              const newBoard = new Map(prev.board);
+              newBoard.set(`${msg.q},${msg.r}`, msg.player);
+              return {
+                ...prev,
+                board: newBoard,
+                currentTurn: msg.currentTurn,
+                piecesPlacedThisTurn: msg.piecesPlacedThisTurn,
+                moveCount: msg.moveCount,
+              };
+            });
             break;
-          case "turn_change":
+          case "game_over":
             setGameState((prev) =>
               prev
                 ? {
                     ...prev,
-                    currentTurn: msg.currentTurn,
-                    piecesPlacedThisTurn: 2 - msg.piecesRemaining,
+                    status: "finished",
+                    winner: msg.winner,
+                    winReason: msg.reason,
+                    winLine: msg.winLine,
                   }
                 : prev,
             );
-            break;
-          case "game_over":
-            setGameState(msg.state);
             break;
           case "draw_offered":
             setDrawOffered(true);

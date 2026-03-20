@@ -1,34 +1,82 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { useGameState } from "../../hooks/useGameState";
 import { HexCanvas } from "../../components/HexCanvas";
 import { GameHUD } from "../../components/GameHUD";
-import type { AxialCoord } from "@hex/game-core";
+import type { AxialCoord, GameState, Player } from "@hex/game-core";
+import { rpcGetGameState, rpcJoinGame } from "../../lib/server-rpc.server";
+
+/** JSON round-trips turn Map -> plain object. This restores board to Map<string, Player>. */
+function deserializeBoardMap(state: GameState): GameState {
+  const rawBoard = state.board as unknown as Record<string, Player>;
+  return { ...state, board: new Map<string, Player>(Object.entries(rawBoard)) };
+}
+
+const getGameFn = createServerFn({ method: "GET" })
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }): Promise<GameState> => {
+    const res = await rpcGetGameState(id);
+    return JSON.parse(JSON.stringify(res)) as GameState;
+  });
+
+const joinGameFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { id: string; userId: string; role: "X" | "O" }) => d)
+  .handler(async ({ data }) => {
+    const res = await rpcJoinGame(data.id, data.userId, data.role);
+    return { ok: res.ok, error: res.error } as { ok: boolean; error?: string };
+  });
+
 
 export const Route = createFileRoute("/game/$id")({
   component: GamePage,
+  loader: async ({ params }) => {
+    return await getGameFn({ data: params.id });
+  },
 });
 
 function GamePage() {
   const { id } = useParams({ from: "/game/$id" });
-  // For demo: use a stable guest user id based on session storage
-  const userId = (() => {
-    if (typeof window === "undefined") return "guest";
-    let uid = sessionStorage.getItem("hex_user_id");
-    if (!uid) {
-      uid = `guest_${Math.random().toString(36).slice(2, 9)}`;
-      sessionStorage.setItem("hex_user_id", uid);
+  const rawInitialState = Route.useLoaderData();
+  const initialGameState = deserializeBoardMap(rawInitialState);
+
+  const [userId, setUserId] = useState("guest");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      let uid = sessionStorage.getItem("hex_user_id");
+      if (!uid) {
+        uid = `guest_${Math.random().toString(36).slice(2, 9)}`;
+        sessionStorage.setItem("hex_user_id", uid);
+      }
+      setUserId(uid);
     }
-    return uid;
-  })();
+  }, []);
 
   const { gameState, isConnected, placeMove, resign, offerDraw, respondDraw, drawOffered } =
     useGameState(id, userId);
+
+  useEffect(() => {
+    if (!initialGameState || userId === "guest") return;
+    const currentState = gameState || initialGameState;
+
+    if (currentState.status === "waiting") {
+      const isPlayerX = currentState.playerXId === userId;
+      const isPlayerO = currentState.playerOId === userId;
+
+      if (!isPlayerX && !isPlayerO) {
+        const roleToTake = !currentState.playerXId ? "X" : "O";
+        void joinGameFn({ data: { id, userId, role: roleToTake } });
+      }
+    }
+  }, [gameState, initialGameState, id, userId]);
 
   const handleCellClick = (coord: AxialCoord) => {
     placeMove(coord.q, coord.r);
   };
 
-  if (!gameState) {
+  const currentState = gameState || initialGameState;
+
+  if (!currentState) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
@@ -43,11 +91,11 @@ function GamePage() {
     <div className="fixed inset-0 bg-slate-900 overflow-hidden">
       <div className="relative w-full h-full">
         {/* Canvas game board */}
-        <HexCanvas gameState={gameState} userId={userId} onCellClick={handleCellClick} />
+        <HexCanvas gameState={currentState} userId={userId} onCellClick={handleCellClick} />
 
         {/* HUD overlay */}
         <GameHUD
-          gameState={gameState}
+          gameState={currentState}
           userId={userId}
           isConnected={isConnected}
           onResign={resign}

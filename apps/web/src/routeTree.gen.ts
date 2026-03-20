@@ -8,79 +8,170 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as IndexRouteImport } from "./routes/index";
-import { Route as GameIdRouteImport } from "./routes/game/$id";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as LessonsIndexRouteImport } from './routes/lessons/index'
+import { Route as ProfileUsernameRouteImport } from './routes/profile/$username'
+import { Route as LessonsIdRouteImport } from './routes/lessons/$id'
+import { Route as GameIdRouteImport } from './routes/game/$id'
 
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
+const LessonsIndexRoute = LessonsIndexRouteImport.update({
+  id: '/lessons/',
+  path: '/lessons/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileUsernameRoute = ProfileUsernameRouteImport.update({
+  id: '/profile/$username',
+  path: '/profile/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LessonsIdRoute = LessonsIdRouteImport.update({
+  id: '/lessons/$id',
+  path: '/lessons/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GameIdRoute = GameIdRouteImport.update({
-  id: "/game/$id",
-  path: "/game/$id",
+  id: '/game/$id',
+  path: '/game/$id',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
-  "/game/$id": typeof GameIdRoute;
+  '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
+  '/game/$id': typeof GameIdRoute
+  '/lessons/$id': typeof LessonsIdRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/lessons/': typeof LessonsIndexRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
-  "/game/$id": typeof GameIdRoute;
+  '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
+  '/game/$id': typeof GameIdRoute
+  '/lessons/$id': typeof LessonsIdRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/lessons': typeof LessonsIndexRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
-  "/game/$id": typeof GameIdRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
+  '/game/$id': typeof GameIdRoute
+  '/lessons/$id': typeof LessonsIdRoute
+  '/profile/$username': typeof ProfileUsernameRoute
+  '/lessons/': typeof LessonsIndexRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/game/$id";
-  fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/game/$id";
-  id: "__root__" | "/" | "/game/$id";
-  fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/leaderboard'
+    | '/game/$id'
+    | '/lessons/$id'
+    | '/profile/$username'
+    | '/lessons/'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/'
+    | '/leaderboard'
+    | '/game/$id'
+    | '/lessons/$id'
+    | '/profile/$username'
+    | '/lessons'
+  id:
+    | '__root__'
+    | '/'
+    | '/leaderboard'
+    | '/game/$id'
+    | '/lessons/$id'
+    | '/profile/$username'
+    | '/lessons/'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  GameIdRoute: typeof GameIdRoute;
+  IndexRoute: typeof IndexRoute
+  LeaderboardRoute: typeof LeaderboardRoute
+  GameIdRoute: typeof GameIdRoute
+  LessonsIdRoute: typeof LessonsIdRoute
+  ProfileUsernameRoute: typeof ProfileUsernameRoute
+  LessonsIndexRoute: typeof LessonsIndexRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/game/$id": {
-      id: "/game/$id";
-      path: "/game/$id";
-      fullPath: "/game/$id";
-      preLoaderRoute: typeof GameIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lessons/': {
+      id: '/lessons/'
+      path: '/lessons'
+      fullPath: '/lessons/'
+      preLoaderRoute: typeof LessonsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/$username': {
+      id: '/profile/$username'
+      path: '/profile/$username'
+      fullPath: '/profile/$username'
+      preLoaderRoute: typeof ProfileUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lessons/$id': {
+      id: '/lessons/$id'
+      path: '/lessons/$id'
+      fullPath: '/lessons/$id'
+      preLoaderRoute: typeof LessonsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/game/$id': {
+      id: '/game/$id'
+      path: '/game/$id'
+      fullPath: '/game/$id'
+      preLoaderRoute: typeof GameIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LeaderboardRoute: LeaderboardRoute,
   GameIdRoute: GameIdRoute,
-};
+  LessonsIdRoute: LessonsIdRoute,
+  ProfileUsernameRoute: ProfileUsernameRoute,
+  LessonsIndexRoute: LessonsIndexRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx";
-import type { createStart } from "@tanstack/react-start";
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
   }
 }

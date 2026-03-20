@@ -111,13 +111,21 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: "sync"; state: GameState }
-  | { type: "move"; q: number; r: number; player: Player; moveIndex: number; state: GameState }
-  | { type: "turn_change"; currentTurn: Player; piecesRemaining: number }
+  | {
+      type: "move";
+      q: number;
+      r: number;
+      player: Player;
+      moveIndex: number;
+      currentTurn: Player;
+      piecesPlacedThisTurn: number;
+      moveCount: number;
+    }
   | {
       type: "game_over";
       winner: Player | null;
       reason: WinReason;
-      state: GameState;
+      winLine: AxialCoord[] | null;
       eloChange?: EloChange;
     }
   | { type: "error"; message: string }
