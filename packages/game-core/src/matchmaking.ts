@@ -3,12 +3,8 @@
 // Pure functions for ELO-based queue matching with expanding search range.
 // ============================================================================
 
-import type { QueueEntry } from './types'
-import {
-  ELO_SEARCH_BASE,
-  ELO_SEARCH_30S,
-  ELO_SEARCH_60S,
-} from './types'
+import type { QueueEntry } from "./types";
+import { ELO_SEARCH_BASE, ELO_SEARCH_30S, ELO_SEARCH_60S } from "./types";
 
 // ---------------------------------------------------------------------------
 // ELO Search Range
@@ -28,10 +24,10 @@ import {
  * @returns Maximum allowed ELO difference
  */
 export function getSearchRange(waitTimeSeconds: number): number {
-  if (waitTimeSeconds >= 120) return Infinity
-  if (waitTimeSeconds >= 60) return ELO_SEARCH_60S
-  if (waitTimeSeconds >= 30) return ELO_SEARCH_30S
-  return ELO_SEARCH_BASE
+  if (waitTimeSeconds >= 120) return Infinity;
+  if (waitTimeSeconds >= 60) return ELO_SEARCH_60S;
+  if (waitTimeSeconds >= 30) return ELO_SEARCH_30S;
+  return ELO_SEARCH_BASE;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,13 +43,9 @@ export function getSearchRange(waitTimeSeconds: number): number {
  * @param waitTimeSeconds - How long player A has been waiting
  * @returns Whether these two players are eligible to match
  */
-export function shouldMatch(
-  eloA: number,
-  eloB: number,
-  waitTimeSeconds: number,
-): boolean {
-  const maxDiff = getSearchRange(waitTimeSeconds)
-  return Math.abs(eloA - eloB) <= maxDiff
+export function shouldMatch(eloA: number, eloB: number, waitTimeSeconds: number): boolean {
+  const maxDiff = getSearchRange(waitTimeSeconds);
+  return Math.abs(eloA - eloB) <= maxDiff;
 }
 
 /**
@@ -61,10 +53,10 @@ export function shouldMatch(
  * Uses the longer wait time of the two players to determine the search range.
  */
 export function canMatch(a: QueueEntry, b: QueueEntry, nowSeconds: number): boolean {
-  const waitA = nowSeconds - a.enqueuedAt
-  const waitB = nowSeconds - b.enqueuedAt
-  const maxWait = Math.max(waitA, waitB)
-  return shouldMatch(a.elo, b.elo, maxWait)
+  const waitA = nowSeconds - a.enqueuedAt;
+  const waitB = nowSeconds - b.enqueuedAt;
+  const maxWait = Math.max(waitA, waitB);
+  return shouldMatch(a.elo, b.elo, maxWait);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,28 +81,28 @@ export function findBestMatch(
   queue: QueueEntry[],
   waitTimeSeconds: number,
 ): QueueEntry | null {
-  if (queue.length === 0) return null
+  if (queue.length === 0) return null;
 
-  const maxDiff = getSearchRange(waitTimeSeconds)
+  const maxDiff = getSearchRange(waitTimeSeconds);
 
   // Filter to eligible opponents
   const eligible = queue.filter((entry) => {
-    if (maxDiff === Infinity) return true
-    return Math.abs(entry.elo - playerElo) <= maxDiff
-  })
+    if (maxDiff === Infinity) return true;
+    return Math.abs(entry.elo - playerElo) <= maxDiff;
+  });
 
-  if (eligible.length === 0) return null
+  if (eligible.length === 0) return null;
 
   // Sort by ELO distance (closest match first), then by wait time (longest waiting first)
   eligible.sort((a, b) => {
-    const distA = Math.abs(a.elo - playerElo)
-    const distB = Math.abs(b.elo - playerElo)
-    if (distA !== distB) return distA - distB
+    const distA = Math.abs(a.elo - playerElo);
+    const distB = Math.abs(b.elo - playerElo);
+    if (distA !== distB) return distA - distB;
     // Tiebreak: prefer the player who has been waiting longer
-    return a.enqueuedAt - b.enqueuedAt
-  })
+    return a.enqueuedAt - b.enqueuedAt;
+  });
 
-  return eligible[0]
+  return eligible[0];
 }
 
 /**
@@ -127,49 +119,49 @@ export function findMatches(
   queue: QueueEntry[],
   nowSeconds: number,
 ): { playerA: QueueEntry; playerB: QueueEntry }[] {
-  if (queue.length < 2) return []
+  if (queue.length < 2) return [];
 
   // Sort by wait time (longest waiting first)
-  const sorted = [...queue].sort((a, b) => a.enqueuedAt - b.enqueuedAt)
+  const sorted = [...queue].sort((a, b) => a.enqueuedAt - b.enqueuedAt);
 
-  const matched = new Set<number>() // indices of matched players
-  const pairs: { playerA: QueueEntry; playerB: QueueEntry }[] = []
+  const matched = new Set<number>(); // indices of matched players
+  const pairs: { playerA: QueueEntry; playerB: QueueEntry }[] = [];
 
   for (let i = 0; i < sorted.length; i++) {
-    if (matched.has(i)) continue
+    if (matched.has(i)) continue;
 
-    const player = sorted[i]
-    const waitTime = nowSeconds - player.enqueuedAt
+    const player = sorted[i];
+    const waitTime = nowSeconds - player.enqueuedAt;
 
     // Find best match among remaining unmatched players
-    let bestIndex = -1
-    let bestDiff = Infinity
+    let bestIndex = -1;
+    let bestDiff = Infinity;
 
     for (let j = i + 1; j < sorted.length; j++) {
-      if (matched.has(j)) continue
+      if (matched.has(j)) continue;
 
-      const candidate = sorted[j]
-      const diff = Math.abs(player.elo - candidate.elo)
+      const candidate = sorted[j];
+      const diff = Math.abs(player.elo - candidate.elo);
 
-      if (!shouldMatch(player.elo, candidate.elo, waitTime)) continue
+      if (!shouldMatch(player.elo, candidate.elo, waitTime)) continue;
 
       if (diff < bestDiff) {
-        bestDiff = diff
-        bestIndex = j
+        bestDiff = diff;
+        bestIndex = j;
       }
     }
 
     if (bestIndex !== -1) {
-      matched.add(i)
-      matched.add(bestIndex)
+      matched.add(i);
+      matched.add(bestIndex);
       pairs.push({
         playerA: player,
         playerB: sorted[bestIndex],
-      })
+      });
     }
   }
 
-  return pairs
+  return pairs;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,16 +178,16 @@ export function assignRoles(
   playerB: QueueEntry,
 ): { playerX: QueueEntry; playerO: QueueEntry } {
   if (playerA.elo < playerB.elo) {
-    return { playerX: playerA, playerO: playerB }
+    return { playerX: playerA, playerO: playerB };
   }
   if (playerB.elo < playerA.elo) {
-    return { playerX: playerB, playerO: playerA }
+    return { playerX: playerB, playerO: playerA };
   }
   // Equal ELO: whoever joined first gets X
   if (playerA.enqueuedAt <= playerB.enqueuedAt) {
-    return { playerX: playerA, playerO: playerB }
+    return { playerX: playerA, playerO: playerB };
   }
-  return { playerX: playerB, playerO: playerA }
+  return { playerX: playerB, playerO: playerA };
 }
 
 /**
@@ -203,9 +195,9 @@ export function assignRoles(
  * Uses timestamp + random suffix for uniqueness.
  */
 export function generateGameId(): string {
-  const timestamp = Date.now().toString(36)
-  const random = Math.random().toString(36).substring(2, 8)
-  return `game_${timestamp}_${random}`
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `game_${timestamp}_${random}`;
 }
 
 /**
@@ -220,6 +212,6 @@ export function estimateWaitTime(
   avgMatchIntervalSeconds: number = 10,
 ): number {
   // Each pair of players = one match, so position / 2 matches need to happen
-  const matchesAhead = Math.ceil(queuePosition / 2)
-  return matchesAhead * avgMatchIntervalSeconds
+  const matchesAhead = Math.ceil(queuePosition / 2);
+  return matchesAhead * avgMatchIntervalSeconds;
 }

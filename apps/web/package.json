@@ -1,26 +1,23 @@
 {
   "name": "@hex/web",
-  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port 3000",
-    "build": "vite build",
-    "serve": "vite preview",
-    "test": "vitest run",
+    "dev": "vp dev --port 3000",
+    "build": "vp build",
+    "serve": "vp preview",
+    "test": "vp test",
     "deploy": "pnpm run build && wrangler deploy",
     "preview": "pnpm run build && vite preview",
     "db:generate": "pnpm drizzle-kit generate --config=drizzle.config.ts",
     "db:generate:do": "pnpm drizzle-kit generate --config=drizzle-do.config.ts",
     "db:migrate": "pnpm wrangler d1 migrations apply DB",
-    "cf-typegen": "wrangler types",
-    "typecheck": "tsc --noEmit"
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "@hex/game-core": "workspace:*",
-    "@hex/db": "workspace:*",
-    "@hex/ui": "workspace:*",
     "@cloudflare/vite-plugin": "^1.25.2",
+    "@hex/db": "workspace:*",
+    "@hex/game-core": "workspace:*",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-devtools": "^0.9.6",
     "@tanstack/react-router": "^1.162.4",

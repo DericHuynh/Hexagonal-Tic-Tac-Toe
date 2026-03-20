@@ -1,49 +1,52 @@
 {
   "name": "hex-tic-tac-toe",
   "private": true,
-  "sideEffects": false,
   "license": "LGPL-3.0-only",
   "author": "Cloudflare, Inc. (https://cloudflare.com)",
-  "packageManager": "pnpm@10.32.1",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
+  "sideEffects": false,
   "scripts": {
-    "dev": "pnpm --filter web dev",
-    "build": "pnpm --filter web build",
-    "serve": "pnpm --filter web serve",
-    "test": "vitest run",
-    "test:game-core": "pnpm --filter game-core test",
-    "deploy": "pnpm --filter web deploy",
-    "preview": "pnpm --filter web preview",
-    "db:generate": "pnpm --filter web db:generate",
-    "db:generate:do": "pnpm --filter web db:generate:do",
-    "db:migrate": "pnpm --filter web db:migrate",
-    "cf-typegen": "pnpm --filter web cf-typegen",
-    "typecheck": "pnpm --recursive typecheck"
+    "dev": "vp run --filter web dev",
+    "build": "vp run --filter web build",
+    "serve": "vp run --filter web serve",
+    "test": "vp run -r test",
+    "test:game-core": "vp run --filter game-core test",
+    "check": "vp run -r check",
+    "lint": "vp run -r lint",
+    "fmt": "vp fmt",
+    "deploy": "vp run --filter web deploy",
+    "preview": "vp run --filter web preview",
+    "db:generate": "vp run --filter web db:generate",
+    "db:generate:do": "vp run --filter web db:generate:do",
+    "db:migrate": "vp run --filter web db:migrate",
+    "cf-typegen": "vp run --filter web cf-typegen",
+    "typecheck": "vp run -r typecheck",
+    "prepare": "vp config"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.12.14",
-    "drizzle-kit": "^0.31.9",
-    "drizzle-orm": "^0.45.1",
-    "turbo": "^2.8.19",
-    "typescript": "^5.7.2",
-    "vite": "^7.1.7",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.67.0"
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "drizzle-kit": "catalog:",
+    "drizzle-orm": "catalog:",
+    "typescript": "catalog:",
+    "vite": "npm:@voidzero-dev/vite-plus-core@^0.1.12",
+    "vite-plus": "catalog:",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@^0.1.12",
+    "wrangler": "catalog:"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=24"
   },
+  "packageManager": "pnpm@10.32.1",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
+      "msw",
       "sharp",
+      "unrs-resolver",
       "workerd"
-    ],
-    "overrides": {
-      "esbuild": "0.25.1"
-    }
+    ]
   }
 }

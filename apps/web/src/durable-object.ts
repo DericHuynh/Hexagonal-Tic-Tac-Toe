@@ -1,75 +1,29 @@
-
-
 import { DurableObject } from "cloudflare:workers";
-
 import { drizzle, DrizzleSqliteDODatabase } from "drizzle-orm/durable-sqlite";
-
-
-
-
-
-
-import { eq, sql } from "drizzle-orm";
-
-
-
-
-
-
-
-
-
-
-
-
-import { gameState, cells, moves } from "@hex/db/do-schema";
-
-import {
-  createBoard,
-  forceSetCell,
-  getCell,
-  isCellEmpty,
-  boardToArray,
-  boardToString,
-  isValidCell,
-  checkWinFromCell,
-  createTurnState,
-  placePiece as applyTurnPiece,
-  getPiecesRemaining,
-  getCurrentPlayer,
-  restoreTurnState,
-  calculateMatchElo,
-  shouldCountForElo,
-  getRatingTier,
-  generateGameId,
-  BOARD_RADIUS,
-  WIN_LENGTH,
-  axialToKey,
-} from "@hex/game-core";
+import { migrate } from "drizzle-orm/durable-sqlite/migrator";
+import { eq } from "drizzle-orm";
+import doMigrations from "../drizzle/do-migrations";
+import { gameState, cells, moves } from "./db/do-schema";
+import { isCellEmpty, isBoardFull, boardFromArray, axialToKey } from "@hex/game-core";
+import { placePiece, getPiecesRemaining, restoreTurnState } from "@hex/game-core";
+import { checkWinFromCell } from "@hex/game-core";
 import type {
   Player,
-  Board,
-  AxialCoord,
-  GameState as GameCoreState,
-  GameStatus,
-  WinReason,
-  TurnState,
-  ServerMessage,
   ClientMessage,
-  MoveResult,
-  EloChange,
+  ServerMessage,
+  GameState,
+  AxialCoord,
+  Board,
+  WinReason,
 } from "@hex/game-core";
+import { BOARD_RADIUS } from "@hex/game-core";
 
-// ---------------------------------------------------------------------------
-// WebSocket tag constants
-// ---------------------------------------------------------------------------
-const WS_PLAYER_X = "player_x";
-const WS_PLAYER_O = "player_o";
-const WS_SPECTATOR = "spectator";
+type CellRow = { q: number; r: number; player: string };
 
-// ---------------------------------------------------------------------------
-// GameSession Durable Object
-// ---------------------------------------------------------------------------
+function boardFromRows(rows: CellRow[]): Board {
+  return boardFromArray(rows.map((r) => ({ q: r.q, r: r.r, player: r.player as Player })));
+}
+
 export class GameSession extends DurableObject<Env> {
   storage: DurableObjectStorage;
   db: DrizzleSqliteDODatabase<any>;
@@ -78,970 +32,342 @@ export class GameSession extends DurableObject<Env> {
     super(ctx, env);
     this.storage = ctx.storage;
     this.db = drizzle(this.storage, { logger: false });
-
-
     ctx.blockConcurrencyWhile(async () => {
-
-
-      await this.db.run(sql.raw(`
-        CREATE TABLE IF NOT EXISTS game_state (
-
-          id INTEGER PRIMARY KEY DEFAULT 1 NOT NULL,
-
-          status TEXT DEFAULT 'waiting' NOT NULL,
-
-          player_x_id TEXT,
-
-          player_o_id TEXT,
-
-          current_turn TEXT DEFAULT 'X' NOT NULL,
-
-          pieces_placed_this_turn INTEGER DEFAULT 0 NOT NULL,
-
-          move_count INTEGER DEFAULT 0 NOT NULL,
-
-          winner TEXT,
-
-          win_reason TEXT,
-
-          win_line TEXT,
-
-          started_at INTEGER,
-
-          updated_at INTEGER NOT NULL
-
-        )
-
-      `));
-
-
-      await this.db.run(sql.raw(`
-
-        CREATE TABLE IF NOT EXISTS cells (
-
-          q INTEGER NOT NULL,
-
-          r INTEGER NOT NULL,
-
-          player TEXT NOT NULL,
-
-          placed_at INTEGER NOT NULL,
-
-          move_index INTEGER NOT NULL,
-
-          PRIMARY KEY (q, r)
-
-        )
-
-      `));
-
-
-      await this.db.run(sql.raw(`
-
-        CREATE TABLE IF NOT EXISTS moves (
-
-          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-
-          player TEXT NOT NULL,
-
-          q INTEGER NOT NULL,
-
-          r INTEGER NOT NULL,
-
-          move_index INTEGER NOT NULL,
-
-          timestamp INTEGER NOT NULL
-
-        )
-
-      `));
-
+      await migrate(this.db, doMigrations);
     });
-
   }
 
-  // =========================================================================
-  // Private Helpers
-  // =========================================================================
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
 
-  /** Load the game state singleton row, or null if not initialized */
-  private async _loadGameState(): Promise<
-    typeof gameState.$inferSelect | null
-  > {
-    const rows = await this.db
-      .select()
-      .from(gameState)
-      .where(eq(gameState.id, 1));
-    return rows.length > 0 ? rows[0] : null;
+  private async _getOrCreateState() {
+    const rows = await this.db.select().from(gameState).where(eq(gameState.id, 1));
+    if (rows.length === 0) {
+      await this.db.insert(gameState).values({ id: 1 });
+      return (await this.db.select().from(gameState).where(eq(gameState.id, 1)))[0];
+    }
+    return rows[0];
   }
 
-  /** Load the board as a Board Map from the cells table */
-  private async _loadBoard(): Promise<Board> {
-    const rows = await this.db.select().from(cells);
-    const board = createBoard();
-    for (const row of rows) {
-      board.set(axialToKey({ q: row.q, r: row.r }), row.player as Player);
-    }
-    return board;
+  private async _getBoard(): Promise<Board> {
+    const cellRows = await this.db.select().from(cells);
+    return boardFromRows(cellRows);
   }
 
-  /** Build the full GameCoreState from the database */
-  private async _buildFullState(): Promise<GameCoreState> {
-    const gs = await this._loadGameState();
-    if (!gs) {
-      throw new Error("Game not initialized");
+  private _broadcast(msg: ServerMessage) {
+    const json = JSON.stringify(msg);
+    for (const ws of this.ctx.getWebSockets()) {
+      ws.send(json);
     }
-    const board = await this._loadBoard();
+  }
 
-    // Parse win line from JSON if present
-    let winLine: AxialCoord[] | null = null;
-    if (gs.winLine) {
-      try {
-        winLine = JSON.parse(gs.winLine);
-      } catch {
-        winLine = null;
-      }
-    }
+  private _sendToWs(ws: WebSocket, msg: ServerMessage) {
+    ws.send(JSON.stringify(msg));
+  }
 
+  private async _buildGameState(): Promise<GameState> {
+    const gs = await this._getOrCreateState();
+    const board = await this._getBoard();
     return {
-      gameId: (await this.storage.get<string>("gameId")) ?? "unknown",
-      status: gs.status as GameStatus,
+      gameId: this.ctx.id.toString(),
+      status: (gs.status ?? "waiting") as any,
       boardRadius: BOARD_RADIUS,
       board,
-      playerXId: gs.playerXId,
-      playerOId: gs.playerOId,
-      currentTurn: gs.currentTurn as Player,
-      piecesPlacedThisTurn: gs.piecesPlacedThisTurn,
-      moveCount: gs.moveCount,
-      winner: (gs.winner as Player) ?? null,
-      winReason: (gs.winReason as WinReason) ?? null,
-      winLine,
-      startedAt: gs.startedAt,
-      updatedAt: gs.updatedAt,
+      playerXId: gs.playerXId ?? null,
+      playerOId: gs.playerOId ?? null,
+      currentTurn: (gs.currentTurn ?? "X") as Player,
+      piecesPlacedThisTurn: gs.piecesPlacedThisTurn ?? 0,
+      moveCount: gs.moveCount ?? 0,
+      winner: (gs.winner ?? null) as Player | null,
+      winReason: (gs.winReason ?? null) as WinReason | null,
+      winLine: gs.winLine ? JSON.parse(gs.winLine) : null,
+      startedAt: gs.startedAt ?? null,
+      updatedAt: gs.updatedAt ?? Math.floor(Date.now() / 1000),
     };
   }
 
-  /** Broadcast a message to all connected WebSockets */
-  private _broadcast(message: ServerMessage) {
-    const payload = JSON.stringify(message);
-    for (const ws of this.ctx.getWebSockets()) {
-      try {
-        ws.send(payload);
-      } catch {
-        // ignore send errors on stale connections
-      }
-    }
-  }
-
-  /** Broadcast a message only to WebSockets with a specific tag */
-  private _broadcastToTag(tag: string, message: ServerMessage) {
-    const payload = JSON.stringify(message);
-    for (const ws of this.ctx.getWebSockets(tag)) {
-      try {
-        ws.send(payload);
-      } catch {
-        // ignore
-      }
-    }
-  }
-
-  /** Get the WebSocket tag for a player */
-  private _getPlayerTag(playerId: string): string | null {
-    return this.ctx.getTags(this.ctx.getWebSockets()).length >= 0 ? null : null;
-  }
-
-  /** Determine which player (X or O) a given userId is */
-  private async _getPlayerRole(userId: string): Promise<Player | null> {
-    const gs = await this._loadGameState();
-    if (!gs) return null;
-    if (gs.playerXId === userId) return "X";
-    if (gs.playerOId === userId) return "O";
-    return null;
-  }
-
-  /** Update the game_state table */
-  private async _updateGameState(
-    updates: Partial<typeof gameState.$inferInsert>,
-  ) {
-    await this.db
-      .update(gameState)
-      .set({ ...updates, updatedAt: Math.floor(Date.now() / 1000) })
-      .where(eq(gameState.id, 1));
-  }
-
-  /** Persist the final match result to D1 */
-  private async _persistToD1(
-    winner: Player | null,
-    winReason: WinReason,
-    eloChange?: EloChange,
-  ) {
-    const gs = await this._loadGameState();
-    if (!gs || !gs.playerXId || !gs.playerOId) return;
-
-    const gameId =
-      (await this.storage.get<string>("gameId")) ?? generateGameId();
-    const startedAt = gs.startedAt ?? Math.floor(Date.now() / 1000);
-    const endedAt = Math.floor(Date.now() / 1000);
-    const board = await this._loadBoard();
-
-    const winnerId =
-      winner === "X" ? gs.playerXId : winner === "O" ? gs.playerOId : null;
-
-    // Insert match record into D1
-    await this.env.DB.prepare(
-      `INSERT INTO matches (id, player_x_id, player_o_id, winner_id, win_reason, move_count, duration_sec, board_radius, elo_x_before, elo_o_before, elo_x_after, elo_o_after, started_at, ended_at, final_board)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
-        gameId,
-        gs.playerXId,
-        gs.playerOId,
-        winnerId,
-        winReason,
-        gs.moveCount,
-        endedAt - startedAt,
-        BOARD_RADIUS,
-        eloChange ? eloChange.winnerNewElo - eloChange.winnerChange : 1200,
-        eloChange ? eloChange.loserNewElo - eloChange.loserChange : 1200,
-        eloChange
-          ? winner === "X"
-            ? eloChange.winnerNewElo
-            : eloChange.loserNewElo
-          : 1200,
-        eloChange
-          ? winner === "O"
-            ? eloChange.winnerNewElo
-            : eloChange.loserNewElo
-          : 1200,
-        startedAt,
-        endedAt,
-        boardToString(board),
-      )
-      .run();
-
-    // Insert move history into D1
-    const moveRows = await this.db.select().from(moves);
-    for (const move of moveRows) {
-      const playerId = move.player === "X" ? gs.playerXId : gs.playerOId;
-      await this.env.DB.prepare(
-        `INSERT INTO match_moves (match_id, move_index, player_id, q, r, timestamp)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-        .bind(gameId, move.moveIndex, playerId, move.q, move.r, move.timestamp)
-        .run();
-    }
-
-    // Update ratings in D1 if the game counts for ELO
-    if (eloChange && shouldCountForElo(gs.moveCount)) {
-      await this._updateRatings(gs.playerXId, gs.playerOId, winner, eloChange);
-    }
-  }
-
-  /** Update player ratings in D1 */
-  private async _updateRatings(
-    playerXId: string,
-    playerOId: string,
-    winner: Player | null,
-    eloChange: EloChange,
-  ) {
-    const isDraw = winner === null;
-
-    // Update X's rating
-    const xRating = await this.env.DB.prepare(
-      `SELECT * FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-    )
-      .bind(playerXId)
-      .first<any>();
-
-    if (xRating) {
-      const newX = isDraw
-        ? xRating.elo + eloChange.winnerChange
-        : winner === "X"
-          ? eloChange.winnerNewElo
-          : eloChange.loserNewElo;
-
-      const xWins = winner === "X" ? xRating.wins + 1 : xRating.wins;
-      const xLosses = winner === "O" ? xRating.losses + 1 : xRating.losses;
-      const xDraws = isDraw ? xRating.draws + 1 : xRating.draws;
-
-      await this.env.DB.prepare(
-        `UPDATE ratings SET elo = ?, peak_elo = MAX(peak_elo, ?), games_played = games_played + 1, wins = ?, losses = ?, draws = ?, updated_at = ? WHERE user_id = ? AND game_mode = 'standard'`,
-      )
-        .bind(
-          newX,
-          newX,
-          xWins,
-          xLosses,
-          xDraws,
-          Math.floor(Date.now() / 1000),
-          playerXId,
-        )
-        .run();
-    }
-
-    // Update O's rating
-    const oRating = await this.env.DB.prepare(
-      `SELECT * FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-    )
-      .bind(playerOId)
-      .first<any>();
-
-    if (oRating) {
-      const newY = isDraw
-        ? oRating.elo + eloChange.loserChange
-        : winner === "O"
-          ? eloChange.winnerNewElo
-          : eloChange.loserNewElo;
-
-      const oWins = winner === "O" ? oRating.wins + 1 : oRating.wins;
-      const oLosses = winner === "X" ? oRating.losses + 1 : oRating.losses;
-      const oDraws = isDraw ? oRating.draws + 1 : oRating.draws;
-
-      await this.env.DB.prepare(
-        `UPDATE ratings SET elo = ?, peak_elo = MAX(peak_elo, ?), games_played = games_played + 1, wins = ?, losses = ?, draws = ?, updated_at = ? WHERE user_id = ? AND game_mode = 'standard'`,
-      )
-        .bind(
-          newY,
-          newY,
-          oWins,
-          oLosses,
-          oDraws,
-          Math.floor(Date.now() / 1000),
-          playerOId,
-        )
-        .run();
-    }
-  }
-
-  // =========================================================================
+  // -------------------------------------------------------------------------
   // RPC Methods (called from server functions)
-  // =========================================================================
+  // -------------------------------------------------------------------------
 
-  /** Create a new game with two players. Returns the game ID. */
-  async createGame(playerXId: string, playerOId: string): Promise<string> {
-    const gameId = generateGameId();
-    await this.storage.put("gameId", gameId);
-
-    // Initialize game state
-    await this.db.insert(gameState).values({
-      id: 1,
-      status: "active",
-      playerXId,
-      playerOId,
-      currentTurn: "X",
-      piecesPlacedThisTurn: 0,
-      moveCount: 0,
-      winner: null,
-      winReason: null,
-      winLine: null,
-      startedAt: Math.floor(Date.now() / 1000),
-    });
-
-    return gameId;
+  async getGameState(): Promise<GameState> {
+    return this._buildGameState();
   }
 
-  /** Get the current game state (for server functions) */
-  async getGameState(): Promise<GameCoreState> {
-    return this._buildFullState();
-  }
-
-  /** Get game info for the route loader (lightweight) */
-  async getGameInfo(): Promise<{
-    gameId: string;
-    status: GameStatus;
-    playerXId: string | null;
-    playerOId: string | null;
-    currentTurn: Player;
-    moveCount: number;
-  }> {
-    const gs = await this._loadGameState();
-    if (!gs) throw new Error("Game not initialized");
-    const gameId = (await this.storage.get<string>("gameId")) ?? "unknown";
-    return {
-      gameId,
-      status: gs.status as GameStatus,
-      playerXId: gs.playerXId,
-      playerOId: gs.playerOId,
-      currentTurn: gs.currentTurn as Player,
-      moveCount: gs.moveCount,
-    };
-  }
-
-  /** Place a move. Returns the result including updated state. */
-  async placeMove(playerId: string, q: number, r: number): Promise<MoveResult> {
-    const gs = await this._loadGameState();
-    if (!gs) {
-      return {
-        success: false,
-        gameState: await this._buildFullState(),
-        error: "Game not found",
-      };
+  async joinGame(userId: string, role: "X" | "O"): Promise<{ ok: boolean; error?: string }> {
+    const gs = await this._getOrCreateState();
+    if (gs.status !== "waiting") {
+      return { ok: false, error: "Game already started" };
     }
 
-    // Validate game is active
+    const update: Record<string, any> = { updatedAt: Math.floor(Date.now() / 1000) };
+    if (role === "X") {
+      if (gs.playerXId) return { ok: false, error: "X slot already taken" };
+      update.playerXId = userId;
+    } else {
+      if (gs.playerOId) return { ok: false, error: "O slot already taken" };
+      update.playerOId = userId;
+    }
+
+    // Check if both players are now set after this update
+    const newXId = role === "X" ? userId : gs.playerXId;
+    const newOId = role === "O" ? userId : gs.playerOId;
+    if (newXId && newOId) {
+      update.status = "active";
+      update.startedAt = Math.floor(Date.now() / 1000);
+    }
+
+    await this.db.update(gameState).set(update).where(eq(gameState.id, 1));
+
+    if (update.status === "active") {
+      const newState = await this._buildGameState();
+      this._broadcast({ type: "sync", state: newState });
+    }
+
+    return { ok: true };
+  }
+
+  async placeMove(userId: string, q: number, r: number): Promise<{ ok: boolean; error?: string }> {
+    const gs = await this._getOrCreateState();
+
     if (gs.status !== "active") {
-      return {
-        success: false,
-        gameState: await this._buildFullState(),
-        error: "Game is not active",
-      };
+      return { ok: false, error: "Game not active" };
     }
 
-    // Determine player role
-    const role = await this._getPlayerRole(playerId);
-    if (!role) {
-      return {
-        success: false,
-        gameState: await this._buildFullState(),
-        error: "You are not a player in this game",
-      };
+    // Verify it's this player's turn
+    const currentPlayer = gs.currentTurn as Player;
+    const isPlayerX = gs.playerXId === userId;
+    const isPlayerO = gs.playerOId === userId;
+    if (!isPlayerX && !isPlayerO) {
+      return { ok: false, error: "You are not in this game" };
+    }
+    if ((currentPlayer === "X" && !isPlayerX) || (currentPlayer === "O" && !isPlayerO)) {
+      return { ok: false, error: "Not your turn" };
     }
 
-    // Check it's this player's turn
-    if (gs.currentTurn !== role) {
-      return {
-        success: false,
-        gameState: await this._buildFullState(),
-        error: "It's not your turn",
-      };
-    }
-
-    // Check the player has pieces remaining
-    const turnState = restoreTurnState({
-      currentTurn: gs.currentTurn as Player,
-      piecesPlacedThisTurn: gs.piecesPlacedThisTurn,
-      moveCount: gs.moveCount,
-    });
-
-    if (getPiecesRemaining(turnState) <= 0) {
-      return {
-        success: false,
-        gameState: await this._buildFullState(),
-        error: "No pieces remaining this turn",
-      };
-    }
-
-    // Validate the cell
+    // Validate move
+    const board = await this._getBoard();
     const coord: AxialCoord = { q, r };
-    if (!isValidCell(coord, BOARD_RADIUS)) {
-      return {
-        success: false,
-        gameState: await this._buildFullState(),
-        error: `Cell (${q}, ${r}) is outside the board`,
-      };
-    }
+    const key = axialToKey(coord);
 
-    const board = await this._loadBoard();
+    if (!isValidHex(q, r, BOARD_RADIUS)) {
+      return { ok: false, error: "Cell out of bounds" };
+    }
     if (!isCellEmpty(board, coord)) {
-      return {
-        success: false,
-        gameState: await this._buildFullState(),
-        error: `Cell (${q}, ${r}) is already occupied`,
-      };
+      return { ok: false, error: "Cell already occupied" };
     }
 
-    // Place the piece in the cells table
-    await this.db.insert(cells).values({
-      q,
-      r,
-      player: role,
-      moveIndex: gs.moveCount,
+    // Place piece
+    const moveIndex = gs.moveCount ?? 0;
+    const now = Math.floor(Date.now() / 1000);
+    await this.db.insert(cells).values({ q, r, player: currentPlayer, moveIndex, placedAt: now });
+    await this.db.insert(moves).values({ q, r, player: currentPlayer, moveIndex, timestamp: now });
+
+    // Update board locally for win check
+    const newBoard = new Map(board);
+    newBoard.set(key, currentPlayer);
+
+    // Check win
+    const winLine = checkWinFromCell(newBoard, coord, currentPlayer, 6, BOARD_RADIUS);
+
+    const turnState = restoreTurnState({
+      currentTurn: currentPlayer,
+      piecesPlacedThisTurn: gs.piecesPlacedThisTurn ?? 0,
+      moveCount: gs.moveCount ?? 0,
     });
+    const nextTurnState = placePiece(turnState);
+    const newMoveCount = nextTurnState.moveCount;
 
-    // Record the move
-    await this.db.insert(moves).values({
-      player: role,
-      q,
-      r,
-      moveIndex: gs.moveCount,
-    });
-
-    // Update the board in memory for win checking
-    const newBoard = forceSetCell(board, coord, role);
-
-    // Check for win
-    const winLine = checkWinFromCell(
-      newBoard,
-      coord,
-      role,
-      WIN_LENGTH,
-      BOARD_RADIUS,
-    );
-
-    // Advance turn state
-    const newTurnState = applyTurnPiece(turnState);
+    let newStatus = gs.status!;
+    let winner: string | null = null;
+    let winReason: string | null = null;
+    let winLineStr: string | null = null;
 
     if (winLine) {
-      // Game over — this player wins!
-      const winReason: WinReason = "six_in_row";
+      newStatus = "finished";
+      winner = currentPlayer;
+      winReason = "six_in_row";
+      winLineStr = JSON.stringify(winLine);
+    } else if (isBoardFull(newBoard, BOARD_RADIUS)) {
+      newStatus = "finished";
+      winReason = "draw";
+    }
 
-      // Calculate ELO changes
-      const gs2 = await this._loadGameState();
-      let eloChange: EloChange | undefined;
-      if (
-        gs2 &&
-        gs2.playerXId &&
-        gs2.playerOId &&
-        shouldCountForElo(gs.moveCount + 1)
-      ) {
-        // Fetch current ratings from D1
-        const xRating = await this.env.DB.prepare(
-          `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-        )
-          .bind(gs2.playerXId)
-          .first<any>();
-        const oRating = await this.env.DB.prepare(
-          `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-        )
-          .bind(gs2.playerOId)
-          .first<any>();
+    await this.db
+      .update(gameState)
+      .set({
+        moveCount: newMoveCount,
+        currentTurn: nextTurnState.currentTurn,
+        piecesPlacedThisTurn: nextTurnState.piecesPlacedThisTurn,
+        status: newStatus,
+        winner: winner,
+        winReason: winReason,
+        winLine: winLineStr,
+        updatedAt: now,
+      })
+      .where(eq(gameState.id, 1));
 
-        const xElo = xRating?.elo ?? 1200;
-        const oElo = oRating?.elo ?? 1200;
-        const xGames = xRating?.games_played ?? 0;
-        const oGames = oRating?.games_played ?? 0;
+    const updatedState = await this._buildGameState();
 
-        if (role === "X") {
-          eloChange = calculateMatchElo(xElo, oElo, xGames, oGames, false);
-        } else {
-          eloChange = calculateMatchElo(oElo, xElo, oGames, xGames, false);
-        }
-      }
+    // Broadcast move
+    this._broadcast({ type: "move", q, r, player: currentPlayer, moveIndex, state: updatedState });
 
-      // Update game state to finished
-      await this._updateGameState({
-        status: "finished",
-        winner: role,
-        winReason,
-        winLine: JSON.stringify(winLine),
-        moveCount: gs.moveCount + 1,
-        currentTurn: newTurnState.currentTurn,
-        piecesPlacedThisTurn: newTurnState.piecesPlacedThisTurn,
-      });
-
-      // Persist to D1
-      await this._persistToD1(role, winReason, eloChange);
-
-      const finalState = await this._buildFullState();
-
-      // Broadcast game over
+    if (newStatus === "finished") {
       this._broadcast({
         type: "game_over",
-        winner: role,
-        reason: winReason,
-        state: finalState,
-        eloChange,
+        winner: winner as Player | null,
+        reason: winReason! as WinReason,
+        state: updatedState,
       });
-
-      return { success: true, gameState: finalState };
-    }
-
-    // Check for tie (board full)
-    const totalCells = 3 * BOARD_RADIUS * (BOARD_RADIUS + 1) + 1;
-    if (newBoard.size >= totalCells) {
-      const winReason: WinReason = "draw";
-
-      // Calculate ELO for draw
-      const gs2 = await this._loadGameState();
-      let eloChange: EloChange | undefined;
-      if (
-        gs2 &&
-        gs2.playerXId &&
-        gs2.playerOId &&
-        shouldCountForElo(gs.moveCount + 1)
-      ) {
-        const xRating = await this.env.DB.prepare(
-          `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-        )
-          .bind(gs2.playerXId)
-          .first<any>();
-        const oRating = await this.env.DB.prepare(
-          `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-        )
-          .bind(gs2.playerOId)
-          .first<any>();
-
-        const xElo = xRating?.elo ?? 1200;
-        const oElo = oRating?.elo ?? 1200;
-        const xGames = xRating?.games_played ?? 0;
-        const oGames = oRating?.games_played ?? 0;
-
-        eloChange = calculateMatchElo(xElo, oElo, xGames, oGames, true);
-      }
-
-      await this._updateGameState({
-        status: "finished",
-        winner: null,
-        winReason,
-        moveCount: gs.moveCount + 1,
-        currentTurn: newTurnState.currentTurn,
-        piecesPlacedThisTurn: newTurnState.piecesPlacedThisTurn,
-      });
-
-      await this._persistToD1(null, winReason, eloChange);
-
-      const finalState = await this._buildFullState();
-
+    } else {
       this._broadcast({
-        type: "game_over",
-        winner: null,
-        reason: winReason,
-        state: finalState,
-        eloChange,
+        type: "turn_change",
+        currentTurn: nextTurnState.currentTurn,
+        piecesRemaining: getPiecesRemaining(nextTurnState),
       });
-
-      return { success: true, gameState: finalState };
     }
 
-    // Normal move — update turn state
-    await this._updateGameState({
-      moveCount: gs.moveCount + 1,
-      currentTurn: newTurnState.currentTurn,
-      piecesPlacedThisTurn: newTurnState.piecesPlacedThisTurn,
-    });
-
-    const newState = await this._buildFullState();
-
-    // Broadcast the move to all connected clients
-    this._broadcast({
-      type: "move",
-      q,
-      r,
-      player: role,
-      moveIndex: gs.moveCount,
-      state: newState,
-    });
-
-    // Also send turn_change
-    this._broadcast({
-      type: "turn_change",
-      currentTurn: newTurnState.currentTurn,
-      piecesRemaining: getPiecesRemaining(newTurnState),
-    });
-
-    return { success: true, gameState: newState };
+    return { ok: true };
   }
 
-  /** Resign from the game */
-  async resign(playerId: string): Promise<void> {
-    const gs = await this._loadGameState();
-    if (!gs || gs.status !== "active") return;
+  async resign(userId: string): Promise<{ ok: boolean }> {
+    const gs = await this._getOrCreateState();
+    if (gs.status !== "active") return { ok: false };
 
-    const role = await this._getPlayerRole(playerId);
-    if (!role) return;
+    const isPlayerX = gs.playerXId === userId;
+    const isPlayerO = gs.playerOId === userId;
+    if (!isPlayerX && !isPlayerO) return { ok: false };
 
-    const winner: Player = role === "X" ? "O" : "X";
-    const winReason: WinReason = "resignation";
+    const winner: Player = isPlayerX ? "O" : "X";
+    const now = Math.floor(Date.now() / 1000);
 
-    // Calculate ELO if game has enough moves
-    let eloChange: EloChange | undefined;
-    if (gs.playerXId && gs.playerOId && shouldCountForElo(gs.moveCount)) {
-      const xRating = await this.env.DB.prepare(
-        `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-      )
-        .bind(gs.playerXId)
-        .first<any>();
-      const oRating = await this.env.DB.prepare(
-        `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-      )
-        .bind(gs.playerOId)
-        .first<any>();
+    await this.db
+      .update(gameState)
+      .set({
+        status: "finished",
+        winner,
+        winReason: "resignation",
+        updatedAt: now,
+      })
+      .where(eq(gameState.id, 1));
 
-      const xElo = xRating?.elo ?? 1200;
-      const oElo = oRating?.elo ?? 1200;
-      const xGames = xRating?.games_played ?? 0;
-      const oGames = oRating?.games_played ?? 0;
+    const updatedState = await this._buildGameState();
+    this._broadcast({ type: "game_over", winner, reason: "resignation", state: updatedState });
 
-      if (winner === "X") {
-        eloChange = calculateMatchElo(xElo, oElo, xGames, oGames, false);
-      } else {
-        eloChange = calculateMatchElo(oElo, xElo, oGames, xGames, false);
-      }
-    }
-
-    await this._updateGameState({
-      status: "finished",
-      winner,
-      winReason,
-    });
-
-    await this._persistToD1(winner, winReason, eloChange);
-
-    const finalState = await this._buildFullState();
-
-    this._broadcast({
-      type: "game_over",
-      winner,
-      reason: winReason,
-      state: finalState,
-      eloChange,
-    });
+    return { ok: true };
   }
 
-  /** Offer a draw */
-  async offerDraw(playerId: string): Promise<void> {
-    const gs = await this._loadGameState();
-    if (!gs || gs.status !== "active") return;
-
-    const role = await this._getPlayerRole(playerId);
-    if (!role) return;
-
-    // Store who offered the draw
-    await this.storage.put("drawOfferedBy", playerId);
-
-    // Notify the opponent
-    const opponentTag = role === "X" ? WS_PLAYER_O : WS_PLAYER_X;
-    this._broadcastToTag(opponentTag, { type: "draw_offered" });
-  }
-
-  /** Respond to a draw offer */
-  async respondDraw(playerId: string, accept: boolean): Promise<void> {
-    const gs = await this._loadGameState();
-    if (!gs || gs.status !== "active") return;
-
-    const offeredBy = await this.storage.get<string>("drawOfferedBy");
-    if (!offeredBy || offeredBy === playerId) return;
-
-    // Clear the draw offer
-    await this.storage.delete("drawOfferedBy");
-
-    if (!accept) {
-      const opponentTag = gs.playerXId === playerId ? WS_PLAYER_O : WS_PLAYER_X;
-      this._broadcastToTag(opponentTag, { type: "draw_declined" });
-      return;
-    }
-
-    // Accept draw
-    const winReason: WinReason = "draw";
-
-    let eloChange: EloChange | undefined;
-    if (gs.playerXId && gs.playerOId && shouldCountForElo(gs.moveCount)) {
-      const xRating = await this.env.DB.prepare(
-        `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-      )
-        .bind(gs.playerXId)
-        .first<any>();
-      const oRating = await this.env.DB.prepare(
-        `SELECT elo, games_played FROM ratings WHERE user_id = ? AND game_mode = 'standard'`,
-      )
-        .bind(gs.playerOId)
-        .first<any>();
-
-      const xElo = xRating?.elo ?? 1200;
-      const oElo = oRating?.elo ?? 1200;
-      const xGames = xRating?.games_played ?? 0;
-      const oGames = oRating?.games_played ?? 0;
-
-      eloChange = calculateMatchElo(xElo, oElo, xGames, oGames, true);
-    }
-
-    await this._updateGameState({
-      status: "finished",
-      winner: null,
-      winReason,
-    });
-
-    await this._persistToD1(null, winReason, eloChange);
-
-    const finalState = await this._buildFullState();
-
-    this._broadcast({
-      type: "game_over",
-      winner: null,
-      reason: winReason,
-      state: finalState,
-      eloChange,
-    });
-  }
-
-  // =========================================================================
-  // WebSocket Handler (fetch is ONLY used for WebSocket connections)
-  // =========================================================================
+  // -------------------------------------------------------------------------
+  // WebSocket
+  // -------------------------------------------------------------------------
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
-      return new Response("Expected WebSocket upgrade", { status: 400 });
+      return new Response("Expected WebSocket", { status: 400 });
     }
 
     const url = new URL(request.url);
-    const playerId = url.searchParams.get("playerId");
+    const userId = url.searchParams.get("userId") ?? "guest";
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
+    this.ctx.acceptWebSocket(server, [userId]);
 
-    // Determine the tag for this connection
-    let tag = WS_SPECTATOR;
-    if (playerId) {
-      const gs = await this._loadGameState();
-      if (gs) {
-        if (gs.playerXId === playerId) tag = WS_PLAYER_X;
-        else if (gs.playerOId === playerId) tag = WS_PLAYER_O;
+    // Send full state sync on connect
+    const state = await this._buildGameState();
+    server.send(JSON.stringify({ type: "sync", state }));
+
+    // Notify the other player that opponent has connected
+    const gs = await this._getOrCreateState();
+    const isPlayerX = gs.playerXId === userId;
+    const isPlayerO = gs.playerOId === userId;
+    if (isPlayerX || isPlayerO) {
+      for (const ws of this.ctx.getWebSockets()) {
+        if (ws !== server) {
+          ws.send(JSON.stringify({ type: "opponent_status", connected: true }));
+        }
       }
-    }
-
-    // Accept the WebSocket with a tag for targeted messaging
-    this.ctx.acceptWebSocket(server, [tag]);
-
-    // Send the current full state immediately
-    try {
-      const state = await this._buildFullState();
-      server.send(
-        JSON.stringify({ type: "sync", state } satisfies ServerMessage),
-      );
-    } catch {
-      // Game might not be initialized yet
-      server.send(
-        JSON.stringify({
-          type: "error",
-          message: "Game not initialized",
-        } satisfies ServerMessage),
-      );
-    }
-
-    // Notify opponent that this player connected
-    if (tag === WS_PLAYER_X || tag === WS_PLAYER_O) {
-      const opponentTag = tag === WS_PLAYER_X ? WS_PLAYER_O : WS_PLAYER_X;
-      this._broadcastToTag(opponentTag, {
-        type: "opponent_status",
-        connected: true,
-      });
     }
 
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  // =========================================================================
-  // WebSocket Hibernation API Handlers
-  // =========================================================================
-
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
-    if (typeof message !== "string") return;
-
-    let parsed: ClientMessage;
     try {
-      parsed = JSON.parse(message);
+      const msg = JSON.parse(typeof message === "string" ? message : "") as ClientMessage;
+      const tags = this.ctx.getTags(ws);
+      const userId = tags[0] ?? "guest";
+
+      if (msg.type === "ping") {
+        this._sendToWs(ws, { type: "pong" });
+        return;
+      }
+
+      if (msg.type === "place") {
+        const result = await this.placeMove(userId, msg.q, msg.r);
+        if (!result.ok) {
+          this._sendToWs(ws, { type: "error", message: result.error ?? "Move failed" });
+        }
+        return;
+      }
+
+      if (msg.type === "resign") {
+        await this.resign(userId);
+        return;
+      }
+
+      if (msg.type === "draw_offer") {
+        // Broadcast to other player
+        for (const other of this.ctx.getWebSockets()) {
+          if (other !== ws) other.send(JSON.stringify({ type: "draw_offered" }));
+        }
+        return;
+      }
+
+      if (msg.type === "draw_response") {
+        if (msg.accept) {
+          await this._getOrCreateState();
+          await this.db
+            .update(gameState)
+            .set({
+              status: "finished",
+              winReason: "draw",
+              updatedAt: Math.floor(Date.now() / 1000),
+            })
+            .where(eq(gameState.id, 1));
+          const state = await this._buildGameState();
+          this._broadcast({ type: "game_over", winner: null, reason: "draw", state });
+        } else {
+          // Rejected: notify offerer
+          for (const other of this.ctx.getWebSockets()) {
+            if (other !== ws) other.send(JSON.stringify({ type: "draw_declined" }));
+          }
+        }
+        return;
+      }
     } catch {
-      ws.send(
-        JSON.stringify({
-          type: "error",
-          message: "Invalid JSON",
-        } satisfies ServerMessage),
-      );
-      return;
-    }
-
-    // Get the player ID from the WebSocket tags
-    const tags = this.ctx.getTags(ws);
-    let playerId: string | null = null;
-    if (tags.includes(WS_PLAYER_X)) {
-      const gs = await this._loadGameState();
-      playerId = gs?.playerXId ?? null;
-    } else if (tags.includes(WS_PLAYER_O)) {
-      const gs = await this._loadGameState();
-      playerId = gs?.playerOId ?? null;
-    }
-
-    switch (parsed.type) {
-      case "place": {
-        if (!playerId) {
-          ws.send(
-            JSON.stringify({
-              type: "error",
-              message: "Not a player",
-            } satisfies ServerMessage),
-          );
-          return;
-        }
-        const result = await this.placeMove(playerId, parsed.q, parsed.r);
-        if (!result.success) {
-          ws.send(
-            JSON.stringify({
-              type: "error",
-              message: result.error ?? "Invalid move",
-            } satisfies ServerMessage),
-          );
-        }
-        break;
-      }
-
-      case "resign": {
-        if (!playerId) {
-          ws.send(
-            JSON.stringify({
-              type: "error",
-              message: "Not a player",
-            } satisfies ServerMessage),
-          );
-          return;
-        }
-        await this.resign(playerId);
-        break;
-      }
-
-      case "draw_offer": {
-        if (!playerId) {
-          ws.send(
-            JSON.stringify({
-              type: "error",
-              message: "Not a player",
-            } satisfies ServerMessage),
-          );
-          return;
-        }
-        await this.offerDraw(playerId);
-        break;
-      }
-
-      case "draw_response": {
-        if (!playerId) {
-          ws.send(
-            JSON.stringify({
-              type: "error",
-              message: "Not a player",
-            } satisfies ServerMessage),
-          );
-          return;
-        }
-        await this.respondDraw(playerId, parsed.accept);
-        break;
-      }
-
-      case "ping": {
-        ws.send(JSON.stringify({ type: "pong" } satisfies ServerMessage));
-        break;
-      }
-
-      default: {
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            message: "Unknown message type",
-          } satisfies ServerMessage),
-        );
-      }
+      // ignore parse errors
     }
   }
 
-  async webSocketClose(
-    ws: WebSocket,
-    code: number,
-    reason: string,
-    _wasClean: boolean,
-  ) {
-    // Notify opponent that this player disconnected
-    const tags = this.ctx.getTags(ws);
-    if (tags.includes(WS_PLAYER_X)) {
-      this._broadcastToTag(WS_PLAYER_O, {
-        type: "opponent_status",
-        connected: false,
-      });
-    } else if (tags.includes(WS_PLAYER_O)) {
-      this._broadcastToTag(WS_PLAYER_X, {
-        type: "opponent_status",
-        connected: false,
-      });
-    }
-
+  async webSocketClose(ws: WebSocket, code: number, reason: string) {
     ws.close(code, reason);
+    // Notify others that opponent disconnected
+    const tags = this.ctx.getTags(ws);
+    const userId = tags[0];
+    const gs = await this._getOrCreateState();
+    if (gs.playerXId === userId || gs.playerOId === userId) {
+      for (const other of this.ctx.getWebSockets()) {
+        if (other !== ws) {
+          other.send(JSON.stringify({ type: "opponent_status", connected: false }));
+        }
+      }
+    }
   }
+}
+
+// Utility: validate hex within radius
+function isValidHex(q: number, r: number, radius: number): boolean {
+  return Math.abs(q) <= radius && Math.abs(r) <= radius && Math.abs(q + r) <= radius;
 }

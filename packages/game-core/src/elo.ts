@@ -4,7 +4,7 @@
 // ============================================================================
 
 import type { EloChange, RatingTier } from "./types";
-import { RATING_TIERS, DEFAULT_ELO } from "./types";
+import { RATING_TIERS } from "./types";
 
 // ---------------------------------------------------------------------------
 // K-Factor Tiers
@@ -39,10 +39,7 @@ export function getKFactor(gamesPlayed: number): number {
  * - > 0.5 when player A is higher rated
  * - < 0.5 when player B is higher rated
  */
-export function calculateExpectedScore(
-  ratingA: number,
-  ratingB: number,
-): number {
+export function calculateExpectedScore(ratingA: number, ratingB: number): number {
   return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
 }
 
@@ -119,18 +116,8 @@ export function calculateMatchElo(
 ): EloChange {
   if (isDraw) {
     // Both players get 0.5
-    const winnerResult = calculateRatingChange(
-      winnerElo,
-      loserElo,
-      0.5,
-      winnerGames,
-    );
-    const loserResult = calculateRatingChange(
-      loserElo,
-      winnerElo,
-      0.5,
-      loserGames,
-    );
+    const winnerResult = calculateRatingChange(winnerElo, loserElo, 0.5, winnerGames);
+    const loserResult = calculateRatingChange(loserElo, winnerElo, 0.5, loserGames);
     return {
       winnerChange: winnerResult.change,
       loserChange: loserResult.change,
@@ -139,12 +126,7 @@ export function calculateMatchElo(
     };
   }
 
-  const winnerResult = calculateRatingChange(
-    winnerElo,
-    loserElo,
-    1,
-    winnerGames,
-  );
+  const winnerResult = calculateRatingChange(winnerElo, loserElo, 1, winnerGames);
   const loserResult = calculateRatingChange(loserElo, winnerElo, 0, loserGames);
 
   return {
@@ -177,9 +159,7 @@ export function getRatingTier(elo: number): RatingTier {
  */
 export function getNextTier(elo: number): RatingTier | null {
   const currentTier = getRatingTier(elo);
-  const currentIndex = RATING_TIERS.findIndex(
-    (t) => t.name === currentTier.name,
-  );
+  const currentIndex = RATING_TIERS.findIndex((t) => t.name === currentTier.name);
   if (currentIndex < RATING_TIERS.length - 1) {
     return RATING_TIERS[currentIndex + 1];
   }

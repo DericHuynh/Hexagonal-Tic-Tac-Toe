@@ -1,6 +1,6 @@
 {
   "name": "@hex/db",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -20,12 +20,13 @@
     }
   },
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vp test run",
+    "test:watch": "vp test"
   },
   "devDependencies": {
-    "drizzle-orm": "^0.45.1",
-    "typescript": "^5.7.2",
-    "vitest": "^3.2.4"
+    "drizzle-orm": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
   }
 }

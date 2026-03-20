@@ -139,7 +139,8 @@ hex-tic-tac-toe/
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18+)
-- [pnpm](https://pnpm.io/)
+
+- [Vite+](https://viteplus.dev/) (global CLI: `vp`)
 - A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
 
 ## Getting Started
@@ -147,7 +148,8 @@ hex-tic-tac-toe/
 ### 1. Install dependencies
 
 ```bash
-pnpm install
+
+vp install
 ```
 
 ### 2. Create a D1 database
@@ -178,7 +180,8 @@ pnpm db:migrate --local
 ### 4. Start the dev server
 
 ```bash
-pnpm dev
+
+vp dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -186,28 +189,44 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Commands
 
 | Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start dev server on port 3000 |
-| `pnpm build` | Production build (Vite) |
-| `pnpm test` | Run all tests (vitest run) |
-| `pnpm deploy` | Build + wrangler deploy |
-| `pnpm tsc --noEmit` | Type check |
+
+| ------------------------- | ---------------------------------------- |
+
+| `vp dev` | Start dev server on port 3000 (Vite+) |
+
+| `vp build` | Production build (Vite+) |
+
+| `vp test` | Run all tests (Vitest via Vite+) |
+
+| `vp run deploy` | Build + wrangler deploy (pnpm script) |
+| `vp check` | Type check, lint, and format |
+
+| `vp run db:migrate` | Apply D1 migrations (wrangler) |
 
 ### Database
 
 | Command | Description |
-|---------|-------------|
-| `pnpm db:generate` | Generate D1 migrations after changing schema |
-| `pnpm db:generate:do` | Generate DO SQLite migrations |
-| `pnpm db:migrate` | Apply D1 migrations (add `--remote` for production) |
-| `pnpm cf-typegen` | Regenerate `worker-configuration.d.ts` |
+
+| ------------------------- | --------------------------------------------------- |
+
+| `vp run db:generate` | Generate D1 migrations after changing schema |
+
+| `vp run db:generate:do` | Generate DO SQLite migrations |
+
+| `vp run db:migrate` | Apply D1 migrations (add `--remote` for production) |
+
+| `vp run cf-typegen` | Regenerate `worker-configuration.d.ts` |
 
 ### Testing
 
 ```bash
-pnpm test                                              # Run all tests
-pnpm vitest run packages/game-core/tests/win-checker.test.ts   # Single file
-pnpm vitest run -t "detects 6 in a row on q-axis"     # By name pattern
+
+vp test                                                 # Run all tests
+
+vp test -- run packages/game-core/tests/win-checker.test.ts   # Single file
+
+vp test -- -t "detects 6 in a row on q-axis"           # By name pattern
+
 ```
 
 ## Key Concepts
@@ -224,23 +243,23 @@ Three axes for win detection: along q, along r, and along s (the diagonal).
 
 ### Turn System
 
-| Move # | Player | Pieces Placed |
-|--------|--------|---------------|
-| 0 | X | 1 (opening move) |
-| 1–2 | O | 2 |
-| 3–4 | X | 2 |
-| 5–6 | O | 2 |
-| ... | alternating | 2 |
+| Move # | Player      | Pieces Placed    |
+| ------ | ----------- | ---------------- |
+| 0      | X           | 1 (opening move) |
+| 1–2    | O           | 2                |
+| 3–4    | X           | 2                |
+| 5–6    | O           | 2                |
+| ...    | alternating | 2                |
 
 ### ELO Rating
 
 Standard ELO formula with K-factor tiers:
 
 | Games Played | K-factor |
-|---|---|
-| 0–10 | 40 |
-| 11–30 | 32 |
-| 31+ | 24 |
+| ------------ | -------- |
+| 0–10         | 40       |
+| 11–30        | 32       |
+| 31+          | 24       |
 
 Rating tiers: Bronze (0–799), Silver (800–1199), Gold (1200–1599), Platinum (1600–1999), Diamond (2000–2399), Grandmaster (2400+).
 
@@ -261,36 +280,57 @@ pnpm deploy
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Frontend | TanStack Start (React 19) |
+
+| ------------------ | ---------------------------------------- |
+
+| Frontend framework | TanStack Start (React 19) |
+
 | Routing | TanStack Router (file-based) |
+
 | Styling | Tailwind CSS v4 |
+
 | Rendering | HTML Canvas 2D |
+
 | Real-time | WebSocket Hibernation API |
+
 | Server state | Cloudflare Durable Objects |
+
 | Database | Cloudflare D1 (SQLite) |
+
 | ORM | Drizzle ORM |
+
 | Language | TypeScript (strict mode) |
-| Build | Vite + @cloudflare/vite-plugin |
-| Monorepo | Turborepo + pnpm workspaces |
-| Testing | Vitest + @cloudflare/vitest-pool-workers |
+
+| Build & Tooling | Vite+ (unified toolchain) |
+| Monorepo | Turborepo + pnpm workspaces (catalog) |
+| Testing | Vitest (via Vite+ pool) |
+
 | Deployment | Cloudflare Workers |
 
 ## Implementation Status
 
 ### ✅ Complete (Backend)
+
 - **game-core**: All game logic with 401 passing tests
+
 - **Database schemas**: D1 + DO SQLite with migrations
+
 - **Durable Objects**: GameSession and MatchmakingQueue fully implemented
-- **Integration tests**: WebSocket and DO lifecycle tests
+
+- **Integration tests**: WebSocket and DO lifecycle tests (⚠️ note: DO tests may be broken due to Vite+ compatibility issues with Cloudflare plugins — this is expected and awaiting Cloudflare updates)
 
 ### ⚠️ In Progress
+
 - **Frontend**: Only Header.tsx exists. Canvas rendering, game state hooks, and UI components need implementation
+
 - **Routes**: Game page, lessons, leaderboard, profile not yet built
+
 - **Authentication**: BetterAuth not integrated
+
 - **Content**: Lesson definitions exist in game-core but not seeded to D1
 
 ### 🎯 Next Steps
+
 1. Create D1 database and apply migrations
 2. Implement frontend canvas rendering (HexCanvas, useGameState, useCanvasViewport, canvas-renderer)
 3. Build game page route with WebSocket integration

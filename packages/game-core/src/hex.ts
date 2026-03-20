@@ -3,7 +3,8 @@
 // Pure functions for axial/cube coordinate operations on a hexagonal grid.
 // ============================================================================
 
-import type { AxialCoord, CubeCoord, Player } from "./types";
+import type { AxialCoord, CubeCoord } from "./types";
+
 import { BOARD_RADIUS, HEX_DIRECTIONS } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -29,11 +30,7 @@ export function cubeToAxial(coord: CubeCoord): AxialCoord {
 export function hexDistance(a: AxialCoord, b: AxialCoord): number {
   const ac = axialToCube(a);
   const bc = axialToCube(b);
-  return Math.max(
-    Math.abs(ac.q - bc.q),
-    Math.abs(ac.r - bc.r),
-    Math.abs(ac.s - bc.s),
-  );
+  return Math.max(Math.abs(ac.q - bc.q), Math.abs(ac.r - bc.r), Math.abs(ac.s - bc.s));
 }
 
 // ---------------------------------------------------------------------------
@@ -41,10 +38,7 @@ export function hexDistance(a: AxialCoord, b: AxialCoord): number {
 // ---------------------------------------------------------------------------
 
 /** Check if an axial coordinate is within a hex board of given radius */
-export function isValidCell(
-  coord: AxialCoord,
-  radius: number = BOARD_RADIUS,
-): boolean {
+export function isValidCell(coord: AxialCoord, radius: number = BOARD_RADIUS): boolean {
   return (
     Math.abs(coord.q) <= radius &&
     Math.abs(coord.r) <= radius &&
@@ -65,10 +59,7 @@ export function getNeighbors(coord: AxialCoord): AxialCoord[] {
 }
 
 /** Get valid neighbors within the board radius */
-export function getValidNeighbors(
-  coord: AxialCoord,
-  radius: number = BOARD_RADIUS,
-): AxialCoord[] {
+export function getValidNeighbors(coord: AxialCoord, radius: number = BOARD_RADIUS): AxialCoord[] {
   return getNeighbors(coord).filter((n) => isValidCell(n, radius));
 }
 
@@ -80,11 +71,7 @@ export function getValidNeighbors(
  * Generate a line of cells starting from `start` in a given direction index
  * (0-5, corresponding to HEX_DIRECTIONS) for `length` steps (including start).
  */
-export function getLine(
-  start: AxialCoord,
-  directionIndex: number,
-  length: number,
-): AxialCoord[] {
+export function getLine(start: AxialCoord, directionIndex: number, length: number): AxialCoord[] {
   const dir = HEX_DIRECTIONS[directionIndex % 6];
   const line: AxialCoord[] = [];
   for (let i = 0; i < length; i++) {
@@ -154,10 +141,7 @@ export function keyToAxial(key: string): AxialCoord {
  * Iterate all valid cells in a hex board of given radius.
  * Calls the callback for each (q, r) coordinate.
  */
-export function forEachCell(
-  radius: number,
-  callback: (coord: AxialCoord) => void,
-): void {
+export function forEachCell(radius: number, callback: (coord: AxialCoord) => void): void {
   for (let q = -radius; q <= radius; q++) {
     const rMin = Math.max(-radius, -q - radius);
     const rMax = Math.min(radius, -q + radius);
@@ -186,20 +170,14 @@ export function cellCount(radius: number): number {
 // ---------------------------------------------------------------------------
 
 /** Convert axial coordinate to pixel position (flat-top hexagons) */
-export function axialToPixel(
-  coord: AxialCoord,
-  hexSize: number,
-): { x: number; y: number } {
+export function axialToPixel(coord: AxialCoord, hexSize: number): { x: number; y: number } {
   const x = hexSize * (1.5 * coord.q);
   const y = hexSize * ((Math.sqrt(3) / 2) * coord.q + Math.sqrt(3) * coord.r);
   return { x, y };
 }
 
 /** Convert pixel position to axial coordinate (with rounding) */
-export function pixelToAxial(
-  point: { x: number; y: number },
-  hexSize: number,
-): AxialCoord {
+export function pixelToAxial(point: { x: number; y: number }, hexSize: number): AxialCoord {
   const q = ((2 / 3) * point.x) / hexSize;
   const r = ((-1 / 3) * point.x + (Math.sqrt(3) / 3) * point.y) / hexSize;
   return hexRound({ q, r, s: -q - r });

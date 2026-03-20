@@ -5,12 +5,7 @@
 
 import type { AxialCoord, Board, Player } from "./types";
 import { BOARD_RADIUS, WIN_LENGTH, HEX_DIRECTIONS } from "./types";
-import {
-  axialToKey,
-  getAxisDirections,
-  isValidCell,
-  walkDirection,
-} from "./hex";
+import { axialToKey, getAxisDirections, isValidCell, walkDirection } from "./hex";
 import { getCell } from "./board";
 
 // ---------------------------------------------------------------------------
@@ -165,7 +160,7 @@ export function getPotentialLines(
   const lines: AxialCoord[][] = [];
 
   for (let axis = 0; axis < 3; axis++) {
-    const [dirPos, dirNeg] = getAxisDirections(axis);
+    const [dirPos] = getAxisDirections(axis);
     const dir = HEX_DIRECTIONS[dirPos];
 
     // Generate all contiguous segments of `length` cells that include `coord`
@@ -317,13 +312,7 @@ export function findWinningMoves(
       const testBoard = new Map(board);
       testBoard.set(nKey, player);
 
-      const line = checkWinFromCell(
-        testBoard,
-        neighbor,
-        player,
-        winLength,
-        radius,
-      );
+      const line = checkWinFromCell(testBoard, neighbor, player, winLength, radius);
       if (line) {
         winningMoves.push(neighbor);
       }

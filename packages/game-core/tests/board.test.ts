@@ -2,7 +2,7 @@
 // Hexagonal Tic-Tac-Toe — Board State Tests
 // ============================================================================
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   createBoard,
   getCell,
@@ -104,9 +104,7 @@ describe("setCell", () => {
   it("throws if cell is already occupied", () => {
     const board = createBoard();
     board.set(axialToKey({ q: 0, r: 0 }), "X");
-    expect(() => setCell(board, { q: 0, r: 0 }, "O")).toThrow(
-      "already occupied",
-    );
+    expect(() => setCell(board, { q: 0, r: 0 }, "O")).toThrow("already occupied");
   });
 
   it("can set multiple cells sequentially", () => {
@@ -213,10 +211,7 @@ describe("isBoardFull", () => {
   it("returns false for partially filled board", () => {
     const board = createBoard();
     for (let i = 0; i < 100; i++) {
-      board.set(
-        axialToKey({ q: i % 10, r: Math.floor(i / 10) }),
-        i % 2 === 0 ? "X" : "O",
-      );
+      board.set(axialToKey({ q: i % 10, r: Math.floor(i / 10) }), i % 2 === 0 ? "X" : "O");
     }
     expect(isBoardFull(board)).toBe(false);
   });

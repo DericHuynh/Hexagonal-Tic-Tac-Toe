@@ -2,7 +2,7 @@
 // Hexagonal Tic-Tac-Toe — Matchmaking Tests
 // ============================================================================
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   getSearchRange,
   shouldMatch,
@@ -211,10 +211,7 @@ describe("findMatches", () => {
   it("returns empty array for queue with < 2 players", () => {
     expect(findMatches([], now)).toEqual([]);
     expect(
-      findMatches(
-        [{ userId: "a", elo: 1000, gameMode: "standard", enqueuedAt: 100 }],
-        now,
-      ),
+      findMatches([{ userId: "a", elo: 1000, gameMode: "standard", enqueuedAt: 100 }], now),
     ).toEqual([]);
   });
 
@@ -251,9 +248,7 @@ describe("findMatches", () => {
     const pairs = findMatches(queue, now);
     expect(pairs).toHaveLength(2);
     // Check that pairs are (a,b) and (c,d)
-    const pairElos = pairs.map((p) =>
-      [p.playerA.elo, p.playerB.elo].sort((a, b) => a - b),
-    );
+    const pairElos = pairs.map((p) => [p.playerA.elo, p.playerB.elo].sort((a, b) => a - b));
     expect(pairElos).toContainEqual([1000, 1010]);
     expect(pairElos).toContainEqual([2000, 2010]);
   });
@@ -387,12 +382,8 @@ describe("generateGameId", () => {
   });
 
   it("contains timestamp component", () => {
-    const before = Date.now();
     const id = generateGameId();
-    const after = Date.now();
     const timestampPart = parseInt(id.split("_")[1], 36);
-    // The timestamp should be between before and after (in seconds)
-    const tsMs = timestampPart * 1000; // approximate
     // Not a strict test but verifies format
     expect(id).toMatch(/^game_[a-z0-9]+_[a-z0-9]+$/);
   });

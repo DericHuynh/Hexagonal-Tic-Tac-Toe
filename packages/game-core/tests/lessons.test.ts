@@ -2,7 +2,7 @@
 // Hexagonal Tic-Tac-Toe — Lessons System Tests
 // ============================================================================
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "vite-plus/test";
 import {
   validatePuzzleMove,
   validatePuzzleSolution,
@@ -598,13 +598,7 @@ describe("DEFAULT_LESSONS", () => {
   });
 
   it("all lessons have valid categories", () => {
-    const validCategories = [
-      "basics",
-      "tactics",
-      "strategy",
-      "endgame",
-      "puzzles",
-    ];
+    const validCategories = ["basics", "tactics", "strategy", "endgame", "puzzles"];
     for (const lesson of DEFAULT_LESSONS) {
       expect(validCategories).toContain(lesson.category);
     }

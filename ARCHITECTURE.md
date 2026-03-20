@@ -7,12 +7,14 @@ A real-time multiplayer Hexagonal Tic-Tac-Toe game built as an edge-native appli
 ## 2. Game Rules
 
 ### Board
+
 - Hexagonal grid using **axial coordinates** (q, r) with radius R = 20
 - Valid cells satisfy `abs(q) <= R && abs(r) <= R && abs(q + r) <= R`
 - Total cells: 3 × R × (R + 1) + 1 = **1,261 cells**
 - Three axes for win detection: q-axis, r-axis, s-axis (where s = -q - r)
 
 ### Turn System
+
 1. **X plays first** — places exactly **1 piece**
 2. **O responds** — places **2 pieces** in a row (adjacent moves)
 3. **X plays** — places **2 pieces** in a row
@@ -21,13 +23,15 @@ A real-time multiplayer Hexagonal Tic-Tac-Toe game built as an edge-native appli
 6. If a player completes 6-in-a-row during their first piece of a 2-piece turn, the game ends immediately (they don't place the second piece)
 
 ### Win Condition
+
 - **6 consecutive pieces** along any of the 3 hex axes (q, r, or s direction)
 - Checked via sliding window: for each axis, scan lines of cells for 6 consecutive same-player pieces
 
 ### Tie Condition
+
 - All 1,261 cells are occupied and no player has 6-in-a-row
 
-## 3. Monorepo Structure (Turborepo)
+## 3. Monorepo Structure (Turborepo + Vite+)
 
 ```
 hex-tic-tac-toe/
@@ -113,11 +117,17 @@ hex-tic-tac-toe/
 │       │   └── ui.test.ts
 │       ├── tsconfig.json
 │       └── package.json
+
 ├── turbo.json                       # Turborepo pipeline configuration
+
 ├── package.json                     # Workspace root with delegated scripts
-├── pnpm-workspace.yaml              # pnpm workspace definition
+
+├── pnpm-workspace.yaml              # pnpm workspace definition (with catalog)
+
 ├── vitest.config.ts                 # Root Vitest config (Cloudflare Workers pool)
+
 └── worker-configuration.d.ts        # Generated Cloudflare types (in apps/web)
+
 ```
 
 ## 4. Database Design
@@ -282,18 +292,19 @@ match_result {
 
 ### Key Operations (in `packages/game-core/src/hex.ts`)
 
-| Operation | Formula |
-|-----------|---------|
-| Cube from axial | `(q, r, -q-r)` |
-| Distance | `(abs(q1-q2) + abs(r1-r2) + abs(s1-s2)) / 2` |
-| Valid cell? | `abs(q) <= R && abs(r) <= R && abs(-q-r) <= R` |
-| Neighbors | 6 directions: `(+1,0), (+1,-1), (0,-1), (-1,0), (-1,+1), (0,+1)` |
-| Axial to pixel | `x = size * (3/2 * q)`, `y = size * (sqrt(3)/2 * q + sqrt(3) * r)` |
-| Pixel to axial | Inverse matrix, then round to nearest hex |
+| Operation       | Formula                                                            |
+| --------------- | ------------------------------------------------------------------ |
+| Cube from axial | `(q, r, -q-r)`                                                     |
+| Distance        | `(abs(q1-q2) + abs(r1-r2) + abs(s1-s2)) / 2`                       |
+| Valid cell?     | `abs(q) <= R && abs(r) <= R && abs(-q-r) <= R`                     |
+| Neighbors       | 6 directions: `(+1,0), (+1,-1), (0,-1), (-1,0), (-1,+1), (0,+1)`   |
+| Axial to pixel  | `x = size * (3/2 * q)`, `y = size * (sqrt(3)/2 * q + sqrt(3) * r)` |
+| Pixel to axial  | Inverse matrix, then round to nearest hex                          |
 
 ### Win Detection Algorithm (`win-checker.ts`)
 
 For each newly placed piece at (q, r):
+
 1. For each of the **3 axes** (q-direction, r-direction, s-direction):
    - Walk in the positive direction, counting consecutive same-player pieces
    - Walk in the negative direction, counting consecutive same-player pieces
@@ -304,6 +315,7 @@ For each newly placed piece at (q, r):
 ### Line Generation (for lesson puzzles)
 
 Generate all possible lines of length 6 on the board:
+
 - For each cell, for each of 3 directions, check if 6 consecutive cells exist within bounds
 - Store as arrays of (q, r) tuples for rendering highlights
 
@@ -312,6 +324,7 @@ Generate all possible lines of length 6 on the board:
 ### Why Canvas (not SVG/DOM)
 
 With 1,261 cells, SVG performance degrades on pan/zoom. Canvas provides:
+
 - Constant-time rendering regardless of board size (only draw visible cells)
 - Smooth 60fps pan/zoom via hardware-accelerated 2D context
 - Direct pixel manipulation for hover effects and animations
@@ -334,16 +347,16 @@ Visible Range:
 
 ```typescript
 interface RenderState {
-  cells: Map<string, Player>     // "q,r" → 'X' | 'O'
-  viewport: ViewportState
-  hoverCell: AxialCoord | null
-  lastMove: AxialCoord | null
-  winLine: AxialCoord[] | null   // highlighted winning cells
-  currentPlayer: Player
-  piecesRemaining: number        // pieces left to place this turn
+  cells: Map<string, Player>; // "q,r" → 'X' | 'O'
+  viewport: ViewportState;
+  hoverCell: AxialCoord | null;
+  lastMove: AxialCoord | null;
+  winLine: AxialCoord[] | null; // highlighted winning cells
+  currentPlayer: Player;
+  piecesRemaining: number; // pieces left to place this turn
 }
 
-function render(ctx: CanvasRenderingContext2D, state: RenderState): void
+function render(ctx: CanvasRenderingContext2D, state: RenderState): void;
 ```
 
 - **Grid**: faint hex outlines for visible cells only
@@ -357,6 +370,7 @@ function render(ctx: CanvasRenderingContext2D, state: RenderState): void
 ### WebSocket Protocol
 
 **Client → Server (Durable Object):**
+
 ```typescript
 // Place a piece
 { type: 'place', q: number, r: number }
@@ -375,6 +389,7 @@ function render(ctx: CanvasRenderingContext2D, state: RenderState): void
 ```
 
 **Server → Client:**
+
 ```typescript
 // Full state sync (on connect)
 { type: 'sync', state: GameState }
@@ -416,6 +431,7 @@ function render(ctx: CanvasRenderingContext2D, state: RenderState): void
 ### Calculation (`packages/game-core/src/elo.ts`)
 
 Standard ELO formula:
+
 ```
 E_A = 1 / (1 + 10^((R_B - R_A) / 400))
 R'_A = R_A + K × (S_A - E_A)
@@ -423,24 +439,25 @@ R'_A = R_A + K × (S_A - E_A)
 
 **K-factor tiers:**
 
-| Games Played | K-factor | Rationale |
-|---|---|---|
-| 0–10 | 40 | New players converge quickly |
-| 11–30 | 32 | Still settling |
-| 31+ | 24 | Established rating, slow changes |
+| Games Played | K-factor | Rationale                        |
+| ------------ | -------- | -------------------------------- |
+| 0–10         | 40       | New players converge quickly     |
+| 11–30        | 32       | Still settling                   |
+| 31+          | 24       | Established rating, slow changes |
 
 **Rating tiers (display):**
 
-| ELO Range | Tier | Badge |
-|---|---|---|
-| 0–799 | Bronze | 🟫 |
-| 800–1199 | Silver | ⬜ |
-| 1200–1599 | Gold | 🟨 |
-| 1600–1999 | Platinum | 🩶 |
-| 2000–2399 | Diamond | 💎 |
-| 2400+ | Grandmaster | 👑 |
+| ELO Range | Tier        | Badge |
+| --------- | ----------- | ----- |
+| 0–799     | Bronze      | 🟫    |
+| 800–1199  | Silver      | ⬜    |
+| 1200–1599 | Gold        | 🟨    |
+| 1600–1999 | Platinum    | 🩶    |
+| 2000–2399 | Diamond     | 💎    |
+| 2400+     | Grandmaster | 👑    |
 
 ### Anti-Abuse
+
 - Minimum 5 moves before resignation counts for ELO (prevents instant-quit farming)
 - Abandoned games (disconnect > 60s) count as resignation
 - New accounts have provisional rating (K=40) for first 10 games
@@ -494,6 +511,7 @@ for each player P in queue (sorted by elo):
 ### Structure (Chess.com-style)
 
 **Categories:**
+
 1. **Basics** — How hex grids work, coordinate system, placing pieces
 2. **Tactics** — Forcing moves, forks (threatening two lines simultaneously), blocking
 3. **Strategy** — Center control, piece connectivity, tempo (2-piece turns)
@@ -504,26 +522,26 @@ for each player P in queue (sorted by elo):
 
 ```typescript
 interface Lesson {
-  id: string
-  title: string
-  category: 'basics' | 'tactics' | 'strategy' | 'endgame' | 'puzzles'
-  difficulty: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
-  slides: Slide[]
-  puzzle?: Puzzle
-  xpReward: number
+  id: string;
+  title: string;
+  category: "basics" | "tactics" | "strategy" | "endgame" | "puzzles";
+  difficulty: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  slides: Slide[];
+  puzzle?: Puzzle;
+  xpReward: number;
 }
 
 type Slide =
-  | { type: 'text'; content: string }
-  | { type: 'board'; cells: CellState[]; highlight?: AxialCoord[]; annotation?: string }
-  | { type: 'interactive'; cells: CellState[]; prompt: string; expectedMove: AxialCoord }
+  | { type: "text"; content: string }
+  | { type: "board"; cells: CellState[]; highlight?: AxialCoord[]; annotation?: string }
+  | { type: "interactive"; cells: CellState[]; prompt: string; expectedMove: AxialCoord };
 
 interface Puzzle {
-  board: CellState[]        // starting position
-  playerToMove: Player
-  solution: AxialCoord[]    // sequence of winning moves
-  hints: string[]           // progressive hints
-  timeLimit?: number        // seconds, for timed puzzles
+  board: CellState[]; // starting position
+  playerToMove: Player;
+  solution: AxialCoord[]; // sequence of winning moves
+  hints: string[]; // progressive hints
+  timeLimit?: number; // seconds, for timed puzzles
 }
 ```
 
@@ -553,8 +571,8 @@ interface Puzzle {
 
 ```typescript
 // In route loaders
-const user = await getAuthUser()  // server fn
-if (!user) throw redirect({ to: '/login' })
+const user = await getAuthUser(); // server fn
+if (!user) throw redirect({ to: "/login" });
 ```
 
 ## 12. Data Flow Summary
@@ -599,17 +617,20 @@ if (!user) throw redirect({ to: '/login' })
 ## 13. Performance Considerations
 
 ### Board Rendering
+
 - **Viewport culling**: only iterate cells visible on screen (~50-100 cells at typical zoom)
 - **Offscreen canvas**: pre-render static grid lines to an offscreen canvas, blit on pan
 - **requestAnimationFrame**: batch all draw calls, skip frames when idle
 - **Debounced resize**: recalculate viewport on window resize with 100ms debounce
 
 ### WebSocket
+
 - **Hibernation API**: DO hibernates between messages, no idle CPU cost
 - **Binary encoding**: consider MessagePack for board state sync (1,261 cells × ~10 bytes = ~12KB as JSON, ~4KB as binary)
 - **Delta updates**: send only the new piece placement, not full board state
 
 ### Database
+
 - **D1**: batch writes at game end (match record + all moves + rating updates in one transaction)
 - **DO SQLite**: cells table uses composite primary key (q, r) for O(1) lookups
 - **Indexes**: `matches(player_x_id, ended_at)`, `matches(player_o_id, ended_at)`, `ratings(user_id, game_mode)`
@@ -617,17 +638,20 @@ if (!user) throw redirect({ to: '/login' })
 ## 14. Deployment
 
 ### Cloudflare Resources
+
 - **Worker**: hosts TanStack Start SSR + WebSocket routing
 - **Durable Objects**: GameSession (auto-scaled per game), MatchmakingQueue (singleton)
 - **D1 Database**: single database for all persistent data
 - **KV** (optional): cache lesson content, leaderboard snapshots
 
 ### Environments
+
 - **Local**: `pnpm dev` — miniflare for DO/D1 emulation
 - **Staging**: `pnpm deploy` to a staging worker with separate D1 database
 - **Production**: `pnpm deploy` with production D1 database ID
 
 ### CI/CD
+
 - GitHub Actions: type-check → test → build → deploy
 - D1 migrations applied via `wrangler d1 migrations apply DB --remote` before deploy
 - DO migrations auto-applied on first request after deploy (via `blockConcurrencyWhile`)
@@ -635,37 +659,55 @@ if (!user) throw redirect({ to: '/login' })
 ## 15. Technology Stack Summary
 
 | Layer | Technology |
-|---|---|
+
+| ------------------ | ---------------------------------------- |
+
 | Frontend framework | TanStack Start (React 19) |
+
 | Routing | TanStack Router (file-based) |
+
 | Styling | Tailwind CSS v4 |
+
 | Rendering | HTML Canvas 2D |
+
 | Real-time | WebSocket Hibernation API |
-| Server state | Durable Objects (per-game + matchmaking) |
-| Persistent storage | Cloudflare D1 (SQLite) |
+
+| Server state | Cloudflare Durable Objects |
+| Database | Cloudflare D1 (SQLite) |
+
 | ORM | Drizzle ORM |
-| Auth | BetterAuth |
+
 | Language | TypeScript (strict mode) |
-| Build | Vite + @cloudflare/vite-plugin |
-| Monorepo | Turborepo + pnpm workspaces |
-| Testing | Vitest + @cloudflare/vitest-pool-workers |
+
+| Build & Tooling | Vite+ (unified toolchain) |
+| Monorepo | Turborepo + pnpm workspaces (catalog) |
+| Testing | Vitest (via Vite+ pool) |
 | Deployment | Cloudflare Workers |
 
 ## 16. Implementation Status
 
 ### ✅ Complete (Backend)
+
 - **game-core**: All game logic with 401 passing tests
+
 - **Database schemas**: D1 + DO SQLite with migrations
+
 - **Durable Objects**: GameSession and MatchmakingQueue fully implemented
-- **Integration tests**: WebSocket and DO lifecycle tests
+
+- **Integration tests**: WebSocket and DO lifecycle tests (⚠️ note: DO tests may be broken due to Vite+ compatibility issues with Cloudflare plugins — this is expected and awaiting Cloudflare updates)
 
 ### ⚠️ In Progress
+
 - **Frontend**: Only Header.tsx exists. Canvas rendering, game state hooks, and UI components need implementation
+
 - **Routes**: Game page, lessons, leaderboard, profile not yet built
+
 - **Authentication**: BetterAuth not integrated
+
 - **Content**: Lesson definitions exist in game-core but not seeded to D1
 
 ### 🎯 Next Steps
+
 1. Create D1 database and apply migrations
 2. Implement frontend canvas rendering (HexCanvas, useGameState, useCanvasViewport, canvas-renderer)
 3. Build game page route with WebSocket integration
@@ -677,26 +719,31 @@ if (!user) throw redirect({ to: '/login' })
 ## 17. Key Architectural Decisions
 
 ### Why Durable Objects for Game State?
+
 - **Stateful**: Each game maintains its own state without external coordination
 - **Scalable**: Automatically spawns new instances per game ID
 - **Low latency**: Runs at the edge, close to users
 - **Hibernation**: No cost when idle between games
 
 ### Why Two Database Systems?
+
 - **D1**: Shared, persistent data (users, ratings, match history, lessons) — needs to be queried across all games
 - **DO SQLite**: Per-game transient state (board cells, move history) — isolated per game instance, auto-cleaned when DO is destroyed
 
 ### Why Canvas over SVG/DOM?
+
 - 1,261 cells × 60fps = 75,660 render operations/sec minimum
 - Canvas can handle this easily with viewport culling (~100 cells visible)
 - SVG would require DOM nodes for each cell, causing layout thrashing on pan/zoom
 
 ### Why Not Use Server Functions for Game Moves?
+
 - Game moves require sub-100ms latency and real-time synchronization
 - WebSocket through DO Hibernation API provides bidirectional, low-latency communication
 - Server functions are request/response — would need polling or streaming, less efficient
 
 ### Why Separate game-core Package?
+
 - **Testability**: Pure TypeScript, no Cloudflare/React dependencies, runs in any test environment
 - **Shared**: Both client (optimistic validation) and server (authoritative validation) use identical logic
 - **Deterministic**: No side effects, easy to reason about and debug

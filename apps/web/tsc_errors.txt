@@ -1,0 +1,19 @@
+﻿src/durable-object.ts(337,17): error TS6133: 'gs' is declared but its value is never read.
+src/routes/counter/$id.tsx(13,22): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'Env'.
+src/routes/counter/$id.tsx(20,22): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'Env'.
+src/routes/counter/$id.tsx(27,22): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'Env'.
+src/routes/counter/$id.tsx(90,15): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/routes/counter/$id.tsx(96,17): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/routes/counter/$id.tsx(102,15): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/routes/counter/$id.tsx(108,17): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+test/durable-object.test.ts(3,10): error TS2614: Module '"../src/server"' has no exported member 'WS_COUNTER_PATTERN'. Did you mean to use 'import WS_COUNTER_PATTERN from "../src/server"' instead?
+test/durable-object.test.ts(33,18): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(34,20): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(40,18): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(41,20): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(51,18): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(52,20): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(61,21): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(62,8): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(64,21): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.
+test/durable-object.test.ts(65,8): error TS2339: Property 'MY_DURABLE_OBJECT' does not exist on type 'ProvidedEnv'.

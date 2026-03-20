@@ -3,18 +3,11 @@
 // Pure functions for lesson definitions, puzzle validation, and scoring.
 // ============================================================================
 
-import type {
-  AxialCoord,
-  Board,
-  Lesson,
-  LessonCategory,
-  LessonDifficulty,
-  Puzzle,
-  Player,
-} from "./types";
+import type { AxialCoord, Board, Lesson, LessonCategory, Puzzle } from "./types";
+
 import { BOARD_RADIUS, WIN_LENGTH } from "./types";
-import { axialToKey, isValidCell } from "./hex";
-import { createBoard, getCell, forceSetCell } from "./board";
+import { axialToKey } from "./hex";
+import { createBoard, forceSetCell } from "./board";
 import { checkWinFromCell } from "./win-checker";
 
 // ---------------------------------------------------------------------------
@@ -33,10 +26,7 @@ export function validatePuzzleMove(puzzle: Puzzle, move: AxialCoord): boolean {
  * Check if a sequence of moves solves the puzzle completely.
  * All solution moves must be played (in any order for multi-move puzzles).
  */
-export function validatePuzzleSolution(
-  puzzle: Puzzle,
-  moves: AxialCoord[],
-): boolean {
+export function validatePuzzleSolution(puzzle: Puzzle, moves: AxialCoord[]): boolean {
   if (moves.length !== puzzle.solution.length) return false;
 
   const moveKeys = new Set(moves.map(axialToKey));
@@ -62,13 +52,7 @@ export function applyPuzzleMove(
   board = forceSetCell(board, move, puzzle.playerToMove);
 
   // Check if this creates a win
-  const winLine = checkWinFromCell(
-    board,
-    move,
-    puzzle.playerToMove,
-    WIN_LENGTH,
-    BOARD_RADIUS,
-  );
+  const winLine = checkWinFromCell(board, move, puzzle.playerToMove, WIN_LENGTH, BOARD_RADIUS);
 
   return {
     board,
@@ -137,13 +121,8 @@ export function getTotalXp(lessons: Lesson[]): number {
 /**
  * Filter lessons by category.
  */
-export function filterByCategory(
-  lessons: Lesson[],
-  category: LessonCategory,
-): Lesson[] {
-  return lessons
-    .filter((l) => l.category === category)
-    .sort((a, b) => a.orderIndex - b.orderIndex);
+export function filterByCategory(lessons: Lesson[], category: LessonCategory): Lesson[] {
+  return lessons.filter((l) => l.category === category).sort((a, b) => a.orderIndex - b.orderIndex);
 }
 
 /**
@@ -164,10 +143,7 @@ export function sortLessons(lessons: Lesson[]): Lesson[] {
 /**
  * Get the next uncompleted lesson in a sequence.
  */
-export function getNextLesson(
-  lessons: Lesson[],
-  completedIds: Set<string>,
-): Lesson | null {
+export function getNextLesson(lessons: Lesson[], completedIds: Set<string>): Lesson | null {
   const sorted = sortLessons(lessons);
   return sorted.find((l) => !completedIds.has(l.id)) ?? null;
 }
@@ -204,8 +180,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
         type: "board",
         cells: [],
         highlight: [{ q: 0, r: 0 }],
-        annotation:
-          "The center cell (0, 0) is often the strongest opening move.",
+        annotation: "The center cell (0, 0) is often the strongest opening move.",
       },
       {
         type: "text",
@@ -219,8 +194,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
   {
     id: "basics-2-the-hex-axes",
     title: "The Three Axes",
-    description:
-      "Understand the three directions you can make lines on a hex grid.",
+    description: "Understand the three directions you can make lines on a hex grid.",
     category: "basics",
     difficulty: 1,
     orderIndex: 2,
@@ -296,8 +270,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
   {
     id: "basics-3-two-pieces-per-turn",
     title: "Two Pieces Per Turn",
-    description:
-      "Master the unique turn system where you place 2 pieces each turn.",
+    description: "Master the unique turn system where you place 2 pieces each turn.",
     category: "basics",
     difficulty: 2,
     orderIndex: 3,
@@ -323,8 +296,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
           { q: 1, r: 0 },
           { q: -1, r: 0 },
         ],
-        annotation:
-          "O used both pieces to block X's line on the q-axis while building their own.",
+        annotation: "O used both pieces to block X's line on the q-axis while building their own.",
       },
       {
         type: "text",
@@ -340,8 +312,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
   {
     id: "tactics-1-the-fork",
     title: "The Fork",
-    description:
-      "Create two threats at once that your opponent cannot both block.",
+    description: "Create two threats at once that your opponent cannot both block.",
     category: "tactics",
     difficulty: 3,
     orderIndex: 1,
@@ -432,8 +403,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
           { q: -3, r: 0 },
           { q: 3, r: 0 },
         ],
-        annotation:
-          "O has 5 in a row. X must block at one end. But which end is better?",
+        annotation: "O has 5 in a row. X must block at one end. But which end is better?",
       },
     ],
     puzzle: {
@@ -706,8 +676,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
   {
     id: "puzzle-4-the-squeeze",
     title: "The Squeeze",
-    description:
-      "Force your opponent into a position where they cannot avoid losing.",
+    description: "Force your opponent into a position where they cannot avoid losing.",
     category: "puzzles",
     difficulty: 7,
     orderIndex: 4,

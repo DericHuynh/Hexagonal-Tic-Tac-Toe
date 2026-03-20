@@ -1,4 +1,5 @@
 {
+  "include": ["**/*.ts", "**/*.tsx"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -26,12 +27,7 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@hex/game-core": ["../../packages/game-core/src/index.ts"],
-      "@hex/db": ["../../packages/db/src/index.ts"],
-      "@hex/ui": ["../../packages/ui/src/index.ts"]
+      "@/*": ["./src/*"]
     }
-  },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist"]
+  }
 }

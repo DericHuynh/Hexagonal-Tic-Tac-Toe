@@ -41,7 +41,7 @@ export type {
   UserProfile,
   ViewportState,
   RenderState,
-} from './types'
+} from "./types";
 
 export {
   BOARD_RADIUS,
@@ -53,7 +53,7 @@ export {
   ELO_SEARCH_BASE,
   ELO_SEARCH_30S,
   ELO_SEARCH_60S,
-} from './types'
+} from "./types";
 
 // Hex math
 export {
@@ -78,7 +78,7 @@ export {
   getDirectionIndex,
   getAxisDirections,
   walkDirection,
-} from './hex'
+} from "./hex";
 
 // Board state
 export {
@@ -101,7 +101,7 @@ export {
   boardFromString,
   isValidMove,
   boardToDebugString,
-} from './board'
+} from "./board";
 
 // Win detection
 export {
@@ -111,7 +111,7 @@ export {
   getPotentialLines,
   countOpenLines,
   findWinningMoves,
-} from './win-checker'
+} from "./win-checker";
 
 // Turn management
 export {
@@ -126,7 +126,7 @@ export {
   restoreTurnState,
   simulatePieces,
   turnStateAfterMoveCount,
-} from './turn-manager'
+} from "./turn-manager";
 
 // ELO rating
 export {
@@ -141,7 +141,7 @@ export {
   formatRating,
   shouldCountForElo,
   getProvisionalMultiplier,
-} from './elo'
+} from "./elo";
 
 // Matchmaking
 export {
@@ -153,7 +153,7 @@ export {
   assignRoles,
   generateGameId,
   estimateWaitTime,
-} from './matchmaking'
+} from "./matchmaking";
 
 // Lessons
 export {
@@ -167,4 +167,4 @@ export {
   sortLessons,
   getNextLesson,
   DEFAULT_LESSONS,
-} from './lessons'
+} from "./lessons";

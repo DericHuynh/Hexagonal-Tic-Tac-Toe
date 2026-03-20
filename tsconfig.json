@@ -18,16 +18,16 @@
     "paths": {
       "@hex/game-core": ["./packages/game-core/src/index.ts"],
       "@hex/db": ["./packages/db/src/index.ts"],
-      "@hex/ui": ["./packages/ui/src/index.ts"],
+      "@hex/ui": ["./packages/ui/src/index.ts"]
     },
     "composite": true,
-    "outDir": "./dist",
+    "outDir": "./dist"
   },
   "files": [],
   "references": [
     { "path": "./apps/web" },
     { "path": "./packages/db" },
     { "path": "./packages/game-core" },
-    { "path": "./packages/ui" },
-  ],
+    { "path": "./packages/ui" }
+  ]
 }
