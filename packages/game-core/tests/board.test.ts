@@ -25,7 +25,7 @@ import {
   boardToDebugString,
 } from "../src/board";
 import { axialToKey } from "../src/hex";
-import { BOARD_RADIUS } from "../src/types";
+import { BOARD_RADIUS, type Player } from "../src/types";
 
 describe("createBoard", () => {
   it("creates an empty board", () => {
@@ -153,7 +153,7 @@ describe("forceSetCell", () => {
 
   it("can be used for replay/loading", () => {
     const board = createBoard();
-    const cells = [
+    const cells: { q: number; r: number; player: Player }[] = [
       { q: 0, r: 0, player: "X" },
       { q: 1, r: 0, player: "O" },
       { q: 0, r: 1, player: "X" },
@@ -211,7 +211,7 @@ describe("isBoardFull", () => {
   it("returns false for partially filled board", () => {
     const board = createBoard();
     for (let i = 0; i < 100; i++) {
-      board.set(axialToKey({ q: i % 10, r: Math.floor(i / 10) }), i % 2 === 0 ? "X" : "O");
+      board.set(axialToKey({ q: i % 10, r: Math.floor(i / 10) }), (i % 2 === 0 ? "X" : "O") as Player);
     }
     expect(isBoardFull(board)).toBe(false);
   });
@@ -276,25 +276,22 @@ describe("getPlayerCells", () => {
 
 describe("getLastMove", () => {
   it("returns null for empty history", () => {
-    const board = createBoard();
-    expect(getLastMove(board, [])).toBeNull();
+    expect(getLastMove([])).toBeNull();
   });
 
   it("returns the move with highest moveIndex", () => {
-    const board = createBoard();
     const history = [
       { q: 0, r: 0, moveIndex: 1 },
       { q: 1, r: 0, moveIndex: 3 },
       { q: 0, r: 1, moveIndex: 2 },
     ];
-    const last = getLastMove(board, history);
+    const last = getLastMove(history);
     expect(last).toEqual({ q: 1, r: 0 });
   });
 
   it("handles single move", () => {
-    const board = createBoard();
     const history = [{ q: 2, r: -1, moveIndex: 0 }];
-    expect(getLastMove(board, history)).toEqual({ q: 2, r: -1 });
+    expect(getLastMove(history)).toEqual({ q: 2, r: -1 });
   });
 });
 
@@ -317,7 +314,7 @@ describe("boardToArray / boardFromArray", () => {
   });
 
   it("deserializes array to board correctly", () => {
-    const cells = [
+    const cells: { q: number; r: number; player: Player }[] = [
       { q: 0, r: 0, player: "X" },
       { q: 1, r: 0, player: "O" },
       { q: 0, r: 1, player: "X" },
@@ -334,7 +331,7 @@ describe("boardToArray / boardFromArray", () => {
     for (let i = 0; i < 20; i++) {
       const q = (i % 5) - 2;
       const r = Math.floor(i / 5) - 2;
-      board.set(axialToKey({ q, r }), i % 2 === 0 ? "X" : "O");
+      board.set(axialToKey({ q, r }), (i % 2 === 0 ? "X" : "O") as Player);
     }
     const arr = boardToArray(board);
     const next = boardFromArray(arr);
@@ -438,7 +435,7 @@ describe("Board edge cases", () => {
     for (let i = 0; i < 100; i++) {
       const q = i % 10;
       const r = Math.floor(i / 10);
-      board.set(axialToKey({ q, r }), i % 2 === 0 ? "X" : "O");
+      board.set(axialToKey({ q, r }), (i % 2 === 0 ? "X" : "O") as Player);
     }
     expect(countPieces(board)).toBe(100);
     expect(boardToArray(board)).toHaveLength(100);
