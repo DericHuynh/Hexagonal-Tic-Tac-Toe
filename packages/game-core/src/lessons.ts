@@ -5,7 +5,7 @@
 
 import type { AxialCoord, Board, Lesson, LessonCategory, Puzzle } from "./types";
 
-import { BOARD_RADIUS, WIN_LENGTH } from "./types";
+import { WIN_LENGTH } from "./types";
 import { axialToKey } from "./hex";
 import { createBoard, forceSetCell } from "./board";
 import { checkWinFromCell } from "./win-checker";
@@ -14,18 +14,10 @@ import { checkWinFromCell } from "./win-checker";
 // Puzzle Validation
 // ---------------------------------------------------------------------------
 
-/**
- * Check if a move solves a puzzle.
- * A puzzle move is correct if it matches one of the solution coordinates.
- */
 export function validatePuzzleMove(puzzle: Puzzle, move: AxialCoord): boolean {
   return puzzle.solution.some((s) => s.q === move.q && s.r === move.r);
 }
 
-/**
- * Check if a sequence of moves solves the puzzle completely.
- * All solution moves must be played (in any order for multi-move puzzles).
- */
 export function validatePuzzleSolution(puzzle: Puzzle, moves: AxialCoord[]): boolean {
   if (moves.length !== puzzle.solution.length) return false;
 
@@ -33,26 +25,20 @@ export function validatePuzzleSolution(puzzle: Puzzle, moves: AxialCoord[]): boo
   return puzzle.solution.every((s) => moveKeys.has(axialToKey(s)));
 }
 
-/**
- * Simulate placing a puzzle move on the board and check if it creates
- * the expected outcome (typically a win).
- */
 export function applyPuzzleMove(
   puzzle: Puzzle,
   move: AxialCoord,
 ): { board: Board; isWin: boolean; winLine: AxialCoord[] | null } {
   let board = createBoard();
 
-  // Reconstruct the starting position
   for (const cell of puzzle.cells) {
     board = forceSetCell(board, { q: cell.q, r: cell.r }, cell.player);
   }
 
-  // Apply the move
   board = forceSetCell(board, move, puzzle.playerToMove);
 
-  // Check if this creates a win
-  const winLine = checkWinFromCell(board, move, puzzle.playerToMove, WIN_LENGTH, BOARD_RADIUS);
+  // Puzzle map is dynamic, pass Infinity bounds.
+  const winLine = checkWinFromCell(board, move, puzzle.playerToMove, WIN_LENGTH, Infinity);
 
   return {
     board,
@@ -65,14 +51,6 @@ export function applyPuzzleMove(
 // Puzzle Scoring
 // ---------------------------------------------------------------------------
 
-/**
- * Calculate a puzzle score from 0 to 100 based on:
- * - Correct solution: base 100 points
- * - Hints used: -15 points per hint
- * - Time taken: -1 point per 3 seconds over the par time (if timeLimit set)
- *
- * Minimum score is 0.
- */
 export function calculatePuzzleScore(
   puzzle: Puzzle,
   hintsUsed: number,
@@ -80,10 +58,8 @@ export function calculatePuzzleScore(
 ): number {
   let score = 100;
 
-  // Penalty for hints
   score -= hintsUsed * 15;
 
-  // Penalty for time (if time limit is set)
   if (puzzle.timeLimit && puzzle.timeLimit > 0) {
     const parTime = puzzle.timeLimit;
     if (timeSeconds > parTime) {
@@ -95,12 +71,6 @@ export function calculatePuzzleScore(
   return Math.max(0, Math.min(100, score));
 }
 
-/**
- * Get a star rating (1-3) based on puzzle score.
- * - 3 stars: score >= 85
- * - 2 stars: score >= 60
- * - 1 star:  score >= 0
- */
 export function getStarRating(score: number): 1 | 2 | 3 {
   if (score >= 85) return 3;
   if (score >= 60) return 2;
@@ -111,23 +81,14 @@ export function getStarRating(score: number): 1 | 2 | 3 {
 // Lesson Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Get the total XP available from a set of lessons.
- */
 export function getTotalXp(lessons: Lesson[]): number {
   return lessons.reduce((sum, lesson) => sum + lesson.xpReward, 0);
 }
 
-/**
- * Filter lessons by category.
- */
 export function filterByCategory(lessons: Lesson[], category: LessonCategory): Lesson[] {
   return lessons.filter((l) => l.category === category).sort((a, b) => a.orderIndex - b.orderIndex);
 }
 
-/**
- * Sort lessons by difficulty then order.
- */
 export function sortLessons(lessons: Lesson[]): Lesson[] {
   return [...lessons].sort((a, b) => {
     if (a.category !== b.category) {
@@ -140,9 +101,6 @@ export function sortLessons(lessons: Lesson[]): Lesson[] {
   });
 }
 
-/**
- * Get the next uncompleted lesson in a sequence.
- */
 export function getNextLesson(lessons: Lesson[], completedIds: Set<string>): Lesson | null {
   const sorted = sortLessons(lessons);
   return sorted.find((l) => !completedIds.has(l.id)) ?? null;
@@ -152,10 +110,6 @@ export function getNextLesson(lessons: Lesson[], completedIds: Set<string>): Les
 // Default Lessons
 // ---------------------------------------------------------------------------
 
-/**
- * Seed lessons for the game. These cover all categories from basics
- * through advanced puzzles.
- */
 export const DEFAULT_LESSONS: Lesson[] = [
   // ---- Basics ----
   {
@@ -296,7 +250,8 @@ export const DEFAULT_LESSONS: Lesson[] = [
           { q: 1, r: 0 },
           { q: -1, r: 0 },
         ],
-        annotation: "O used both pieces to block X's line on the q-axis while building their own.",
+        annotation:
+          "O used both pieces to block X's line on the q-axis while building their own.",
       },
       {
         type: "text",
@@ -447,7 +402,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
       {
         type: "text",
         content:
-          "On a radius-20 board, the center region (within 5 cells of origin) contains the most overlapping potential lines. Controlling this area forces your opponent to play on the periphery where their pieces are less connected.",
+          "On a typical radius-20 board, the center region (within 5 cells of origin) contains the most overlapping potential lines. Controlling this area forces your opponent to play on the periphery where their pieces are less connected.",
       },
       {
         type: "board",
@@ -567,8 +522,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
     slides: [
       {
         type: "text",
-        content:
-          "In this puzzle, X has a winning move available. Look for a line of 5 X pieces and place the 6th to win!",
+        content: "In this puzzle, X has a winning move available. Look for a line of 5 X pieces and place the 6th to win!",
       },
     ],
     puzzle: {
@@ -610,26 +564,28 @@ export const DEFAULT_LESSONS: Lesson[] = [
     puzzle: {
       cells: [
         { q: 0, r: 0, player: "X" },
-        { q: 1, r: 0, player: "X" },
-        { q: 2, r: 0, player: "X" },
-        { q: 3, r: 0, player: "X" },
-        { q: 4, r: 0, player: "X" },
-        { q: 0, r: 1, player: "X" },
-        { q: 0, r: 2, player: "X" },
-        { q: 0, r: 3, player: "X" },
-        { q: 0, r: 4, player: "X" },
-        { q: 5, r: 0, player: "O" },
+        { q: 1, r: -1, player: "X" },
+        { q: 2, r: -2, player: "X" },
+        { q: 3, r: -3, player: "X" },
+        { q: 4, r: -4, player: "X" },
         { q: -1, r: 0, player: "O" },
-        { q: 0, r: 5, player: "O" },
         { q: 0, r: -1, player: "O" },
-        { q: 1, r: 1, player: "O" },
+        { q: 1, r: -2, player: "O" },
+        { q: 2, r: -3, player: "O" },
+        { q: 5, r: -4, player: "O" },
+        { q: -1, r: 1, player: "O" },
+        { q: 0, r: 1, player: "X" },
+        { q: 1, r: 0, player: "X" },
+        { q: 2, r: -1, player: "X" },
+        { q: 3, r: -2, player: "X" },
+        { q: 4, r: -3, player: "O" },
       ],
       playerToMove: "X",
-      solution: [{ q: 0, r: 0 }],
+      solution: [{ q: 4, r: -3 }],
       hints: [
-        "Look for a cell that is part of two different lines of X pieces.",
-        "X has 5 on the q-axis and 5 on the r-axis. Where do they intersect?",
-        "Place at (0, 0) — wait, it's already occupied by X! Look more carefully...",
+        "Look beyond the obvious lines. Check all three axes carefully.",
+        "X has pieces on the s-axis (diagonal). Count them.",
+        "The s-axis line through (0,0) goes: (0,0), (1,-1), (2,-2), (3,-3), (4,-4). That's 5! But (4,-4) is blocked by O... look at the other diagonal.",
       ],
       timeLimit: 45,
     },
@@ -645,8 +601,7 @@ export const DEFAULT_LESSONS: Lesson[] = [
     slides: [
       {
         type: "text",
-        content:
-          "O is threatening to win! You must block, but which blocking move also helps your own position?",
+        content: "O is threatening to win! You must block, but which blocking move also helps your own position?",
       },
     ],
     puzzle: {

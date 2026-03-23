@@ -43,23 +43,15 @@ function App() {
           </div>
 
           <h1 className="text-7xl md:text-8xl font-black tracking-tight mb-4 drop-shadow-2xl">
-            <span className="bg-white bg-clip-text text-transparent mr-1.5">
-              Hex
-            </span>
-            <span className="bg-cyan-400 bg-clip-text text-transparent">
-              T
-            </span>
-            <span className=" bg-white bg-clip-text text-transparent">
-              T
-            </span>
-            <span className="bg-orange-400 bg-clip-text text-transparent">
-              T
-            </span>
+            <span className="bg-white bg-clip-text text-transparent mr-1.5">Hex</span>
+            <span className="bg-cyan-400 bg-clip-text text-transparent">T</span>
+            <span className=" bg-white bg-clip-text text-transparent">T</span>
+            <span className="bg-orange-400 bg-clip-text text-transparent">T</span>
           </h1>
           <p className="text-2xl text-slate-300 mb-3 font-light">The hexagonal game of strategy.</p>
           <p className="text-slate-400 max-w-xl mx-auto mb-10 leading-relaxed">
-            Standard Tic-Tac-Toe is solved. Hex TTT adds 1,261 cells and a dynamic double-move system
-            for deep, emergent complexity.
+            Standard Tic-Tac-Toe is solved. Hex TTT adds 1,261 cells and a dynamic double-move
+            system for deep, emergent complexity.
           </p>
 
           <div className="relative inline-block">
@@ -80,7 +72,9 @@ function App() {
                 <div className="flex items-center gap-3 px-8 py-4 bg-slate-900/80 backdrop-blur-xl border border-indigo-500/30 rounded-2xl shadow-2xl">
                   <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                   <span className="text-white font-semibold">Searching for Opponent...</span>
-                  <span className="text-indigo-300 font-mono bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{formatWait(waitSeconds)}</span>
+                  <span className="text-indigo-300 font-mono bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                    {formatWait(waitSeconds)}
+                  </span>
                 </div>
                 <button
                   onClick={() => void leaveQueue()}
@@ -124,7 +118,9 @@ function App() {
               key={feat.title}
               className="bg-slate-900/40 backdrop-blur-md border border-slate-800/50 rounded-2xl p-6 hover:border-indigo-500/40 transition-all group"
             >
-              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform origin-left">{feat.icon}</div>
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform origin-left">
+                {feat.icon}
+              </div>
               <h3 className="text-white font-bold text-lg mb-2">{feat.title}</h3>
               <p className="text-slate-400 text-sm leading-relaxed">{feat.desc}</p>
             </div>

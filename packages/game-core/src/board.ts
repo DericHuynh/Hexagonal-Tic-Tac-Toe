@@ -4,14 +4,13 @@
 // ============================================================================
 
 import type { AxialCoord, Board, CellEntry, Player } from "./types";
-import { BOARD_RADIUS } from "./types";
-import { axialToKey, isValidCell, keyToAxial } from "./hex";
+import { MAX_PLACEMENT_DISTANCE } from "./types";
+import { axialToKey, keyToAxial, hexDistance } from "./hex";
 
 // ---------------------------------------------------------------------------
 // Creation
 // ---------------------------------------------------------------------------
 
-/** Create an empty board */
 export function createBoard(): Board {
   return new Map<string, Player>();
 }
@@ -20,17 +19,14 @@ export function createBoard(): Board {
 // Cell Access
 // ---------------------------------------------------------------------------
 
-/** Get the player occupying a cell, or null if empty */
 export function getCell(board: Board, coord: AxialCoord): Player | null {
   return board.get(axialToKey(coord)) ?? null;
 }
 
-/** Check if a cell is empty (unoccupied) */
 export function isCellEmpty(board: Board, coord: AxialCoord): boolean {
   return !board.has(axialToKey(coord));
 }
 
-/** Check if a cell is occupied */
 export function isCellOccupied(board: Board, coord: AxialCoord): boolean {
   return board.has(axialToKey(coord));
 }
@@ -39,7 +35,6 @@ export function isCellOccupied(board: Board, coord: AxialCoord): boolean {
 // Mutation (immutable — returns new Map)
 // ---------------------------------------------------------------------------
 
-/** Set a cell to a player. Returns a new Board (immutable). Throws if cell is occupied. */
 export function setCell(board: Board, coord: AxialCoord, player: Player): Board {
   const key = axialToKey(coord);
   if (board.has(key)) {
@@ -50,7 +45,6 @@ export function setCell(board: Board, coord: AxialCoord, player: Player): Board 
   return next;
 }
 
-/** Remove a cell's occupant. Returns a new Board (immutable). */
 export function removeCell(board: Board, coord: AxialCoord): Board {
   const key = axialToKey(coord);
   if (!board.has(key)) {
@@ -61,7 +55,6 @@ export function removeCell(board: Board, coord: AxialCoord): Board {
   return next;
 }
 
-/** Place a cell without checking occupancy (for replay/loading). Returns new Board. */
 export function forceSetCell(board: Board, coord: AxialCoord, player: Player): Board {
   const next = new Map(board);
   next.set(axialToKey(coord), player);
@@ -72,12 +65,10 @@ export function forceSetCell(board: Board, coord: AxialCoord, player: Player): B
 // Queries
 // ---------------------------------------------------------------------------
 
-/** Count total pieces on the board */
 export function countPieces(board: Board): number {
   return board.size;
 }
 
-/** Count pieces belonging to a specific player */
 export function countPlayerPieces(board: Board, player: Player): number {
   let count = 0;
   for (const p of board.values()) {
@@ -86,13 +77,12 @@ export function countPlayerPieces(board: Board, player: Player): number {
   return count;
 }
 
-/** Check if the board is completely full */
-export function isBoardFull(board: Board, radius: number = BOARD_RADIUS): boolean {
+export function isBoardFull(board: Board, radius: number = Infinity): boolean {
+  if (!Number.isFinite(radius)) return false; // Dynamic/infinite boards don't natively fill up
   const totalCells = 3 * radius * (radius + 1) + 1;
   return board.size >= totalCells;
 }
 
-/** Get all occupied cells as an array of { coord, player } */
 export function getOccupiedCells(board: Board): CellEntry[] {
   const entries: CellEntry[] = [];
   for (const [key, player] of board) {
@@ -101,7 +91,6 @@ export function getOccupiedCells(board: Board): CellEntry[] {
   return entries;
 }
 
-/** Get all cells occupied by a specific player */
 export function getPlayerCells(board: Board, player: Player): AxialCoord[] {
   const cells: AxialCoord[] = [];
   for (const [key, p] of board) {
@@ -112,7 +101,6 @@ export function getPlayerCells(board: Board, player: Player): AxialCoord[] {
   return cells;
 }
 
-/** Get the last move (highest move index) — requires external move tracking */
 export function getLastMove(
   moveHistory: { q: number; r: number; moveIndex: number }[],
 ): AxialCoord | null {
@@ -125,7 +113,6 @@ export function getLastMove(
 // Serialization
 // ---------------------------------------------------------------------------
 
-/** Serialize board to a JSON-compatible array */
 export function boardToArray(board: Board): { q: number; r: number; player: Player }[] {
   const result: { q: number; r: number; player: Player }[] = [];
   for (const [key, player] of board) {
@@ -135,7 +122,6 @@ export function boardToArray(board: Board): { q: number; r: number; player: Play
   return result;
 }
 
-/** Deserialize board from a JSON array */
 export function boardFromArray(cells: { q: number; r: number; player: Player }[]): Board {
   const board = createBoard();
   for (const cell of cells) {
@@ -144,12 +130,10 @@ export function boardFromArray(cells: { q: number; r: number; player: Player }[]
   return board;
 }
 
-/** Serialize board to a compact string representation */
 export function boardToString(board: Board): string {
   return JSON.stringify(boardToArray(board));
 }
 
-/** Deserialize board from a compact string */
 export function boardFromString(str: string): Board {
   const cells = JSON.parse(str) as { q: number; r: number; player: Player }[];
   return boardFromArray(cells);
@@ -159,18 +143,31 @@ export function boardFromString(str: string): Board {
 // Validation
 // ---------------------------------------------------------------------------
 
-/** Validate a move: cell must be in bounds and empty */
 export function isValidMove(
   board: Board,
   coord: AxialCoord,
-  radius: number = BOARD_RADIUS,
+  maxDistance: number = MAX_PLACEMENT_DISTANCE,
 ): { valid: boolean; error?: string } {
-  if (!isValidCell(coord, radius)) {
-    return { valid: false, error: `Cell (${coord.q}, ${coord.r}) is outside the board` };
-  }
   if (!isCellEmpty(board, coord)) {
     return { valid: false, error: `Cell (${coord.q}, ${coord.r}) is already occupied` };
   }
+
+  // Dynamic Size placement logic: Valid moves must fall within X hexes of ANY existing piece.
+  if (board.size > 0) {
+    let withinRange = false;
+    for (const [key] of board) {
+      const occ = keyToAxial(key);
+      if (hexDistance(coord, occ) <= maxDistance) {
+        withinRange = true;
+        break;
+      }
+    }
+
+    if (!withinRange) {
+      return { valid: false, error: `Move must be within ${maxDistance} hexes of an existing piece` };
+    }
+  }
+
   return { valid: true };
 }
 
@@ -178,10 +175,6 @@ export function isValidMove(
 // Debug / Display
 // ---------------------------------------------------------------------------
 
-/**
- * Create a string representation of the board for debugging.
- * Shows a portion of the board centered around the origin.
- */
 export function boardToDebugString(board: Board, radius: number = 5): string {
   const lines: string[] = [];
   for (let r = -radius; r <= radius; r++) {

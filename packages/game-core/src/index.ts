@@ -3,6 +3,10 @@
 // Barrel export for the shared game logic package.
 // ============================================================================
 
+// AI
+export { getAIConfig, findBestMove } from "./ai/minimax";
+export type { AIDifficulty, AIConfig, AIEvaluation } from "./ai/minimax";
+
 // Types
 export type {
   Player,
@@ -45,6 +49,7 @@ export type {
 
 export {
   BOARD_RADIUS,
+  MAX_PLACEMENT_DISTANCE,
   WIN_LENGTH,
   BOARD_CELL_COUNT,
   HEX_DIRECTIONS,

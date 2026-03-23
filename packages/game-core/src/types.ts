@@ -321,9 +321,10 @@ export interface RenderState {
 // Constants
 // ---------------------------------------------------------------------------
 
-export const BOARD_RADIUS = 20;
+export const BOARD_RADIUS = 20; // Maintained primarily for backwards compatibility with viewport render scales
+export const MAX_PLACEMENT_DISTANCE = 8; // Dynamic rule: pieces must be within 8 hexes of any existing piece
 export const WIN_LENGTH = 6;
-export const BOARD_CELL_COUNT = 3 * BOARD_RADIUS * (BOARD_RADIUS + 1) + 1; // 1261
+export const BOARD_CELL_COUNT = 3 * BOARD_RADIUS * (BOARD_RADIUS + 1) + 1;
 
 export const HEX_DIRECTIONS: AxialCoord[] = [
   { q: 1, r: 0 },

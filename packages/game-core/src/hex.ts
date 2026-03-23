@@ -4,20 +4,17 @@
 // ============================================================================
 
 import type { AxialCoord, CubeCoord } from "./types";
-
 import { BOARD_RADIUS, HEX_DIRECTIONS } from "./types";
 
 // ---------------------------------------------------------------------------
 // Coordinate Conversions
 // ---------------------------------------------------------------------------
 
-/** Convert axial (q, r) to cube (q, r, s) where s = -q - r */
 export function axialToCube(coord: AxialCoord): CubeCoord {
   const s = -coord.q - coord.r;
   return { q: coord.q, r: coord.r, s: s === 0 ? 0 : s };
 }
 
-/** Convert cube (q, r, s) to axial (q, r) — drop s */
 export function cubeToAxial(coord: CubeCoord): AxialCoord {
   return { q: coord.q, r: coord.r };
 }
@@ -26,7 +23,6 @@ export function cubeToAxial(coord: CubeCoord): AxialCoord {
 // Distance
 // ---------------------------------------------------------------------------
 
-/** Hex distance between two axial coordinates */
 export function hexDistance(a: AxialCoord, b: AxialCoord): number {
   const ac = axialToCube(a);
   const bc = axialToCube(b);
@@ -38,7 +34,8 @@ export function hexDistance(a: AxialCoord, b: AxialCoord): number {
 // ---------------------------------------------------------------------------
 
 /** Check if an axial coordinate is within a hex board of given radius */
-export function isValidCell(coord: AxialCoord, radius: number = BOARD_RADIUS): boolean {
+export function isValidCell(coord: AxialCoord, radius: number = Infinity): boolean {
+  if (!Number.isFinite(radius)) return true; // Infinite boundaries for dynamic sizing
   return (
     Math.abs(coord.q) <= radius &&
     Math.abs(coord.r) <= radius &&
@@ -50,7 +47,6 @@ export function isValidCell(coord: AxialCoord, radius: number = BOARD_RADIUS): b
 // Neighbors
 // ---------------------------------------------------------------------------
 
-/** Get the 6 neighboring axial coordinates of a cell */
 export function getNeighbors(coord: AxialCoord): AxialCoord[] {
   return HEX_DIRECTIONS.map((d) => ({
     q: coord.q + d.q,
@@ -58,8 +54,7 @@ export function getNeighbors(coord: AxialCoord): AxialCoord[] {
   }));
 }
 
-/** Get valid neighbors within the board radius */
-export function getValidNeighbors(coord: AxialCoord, radius: number = BOARD_RADIUS): AxialCoord[] {
+export function getValidNeighbors(coord: AxialCoord, radius: number = Infinity): AxialCoord[] {
   return getNeighbors(coord).filter((n) => isValidCell(n, radius));
 }
 
@@ -67,10 +62,6 @@ export function getValidNeighbors(coord: AxialCoord, radius: number = BOARD_RADI
 // Lines & Directions
 // ---------------------------------------------------------------------------
 
-/**
- * Generate a line of cells starting from `start` in a given direction index
- * (0-5, corresponding to HEX_DIRECTIONS) for `length` steps (including start).
- */
 export function getLine(start: AxialCoord, directionIndex: number, length: number): AxialCoord[] {
   const dir = HEX_DIRECTIONS[directionIndex % 6];
   const line: AxialCoord[] = [];
@@ -83,24 +74,17 @@ export function getLine(start: AxialCoord, directionIndex: number, length: numbe
   return line;
 }
 
-/**
- * Get all cells in both directions along an axis through a center cell.
- * axisIndex 0 = q-axis (directions 0 and 3)
- * axisIndex 1 = r-axis (directions 1 and 4)
- * axisIndex 2 = s-axis (directions 2 and 5)
- */
 export function getAxisLine(
   center: AxialCoord,
   axisIndex: number,
-  radius: number = BOARD_RADIUS,
+  radius: number = Infinity,
 ): AxialCoord[] {
-  // Each axis has two opposing directions
   const [dirPos, dirNeg] = getAxisDirections(axisIndex);
-
   const cells: AxialCoord[] = [center];
+  const steps = Number.isFinite(radius) ? radius * 2 : 1000;
 
   // Walk positive direction
-  for (let i = 1; i <= radius; i++) {
+  for (let i = 1; i <= steps; i++) {
     const d = HEX_DIRECTIONS[dirPos];
     const cell: AxialCoord = { q: center.q + d.q * i, r: center.r + d.r * i };
     if (!isValidCell(cell, radius)) break;
@@ -108,7 +92,7 @@ export function getAxisLine(
   }
 
   // Walk negative direction
-  for (let i = 1; i <= radius; i++) {
+  for (let i = 1; i <= steps; i++) {
     const d = HEX_DIRECTIONS[dirNeg];
     const cell: AxialCoord = { q: center.q + d.q * i, r: center.r + d.r * i };
     if (!isValidCell(cell, radius)) break;
@@ -122,12 +106,10 @@ export function getAxisLine(
 // Key Serialization (for Map keys)
 // ---------------------------------------------------------------------------
 
-/** Serialize an axial coordinate to a string key "q,r" */
 export function axialToKey(coord: AxialCoord): string {
   return `${coord.q},${coord.r}`;
 }
 
-/** Deserialize a "q,r" string key back to an axial coordinate */
 export function keyToAxial(key: string): AxialCoord {
   const parts = key.split(",");
   return { q: parseInt(parts[0], 10), r: parseInt(parts[1], 10) };
@@ -137,10 +119,6 @@ export function keyToAxial(key: string): AxialCoord {
 // Iteration
 // ---------------------------------------------------------------------------
 
-/**
- * Iterate all valid cells in a hex board of given radius.
- * Calls the callback for each (q, r) coordinate.
- */
 export function forEachCell(radius: number, callback: (coord: AxialCoord) => void): void {
   for (let q = -radius; q <= radius; q++) {
     const rMin = Math.max(-radius, -q - radius);
@@ -151,16 +129,15 @@ export function forEachCell(radius: number, callback: (coord: AxialCoord) => voi
   }
 }
 
-/**
- * Collect all valid cells in a hex board of given radius as an array.
- */
 export function getAllCells(radius: number = BOARD_RADIUS): AxialCoord[] {
   const cells: AxialCoord[] = [];
+  if (!Number.isFinite(radius)) {
+    throw new Error("Cannot populate all cells for an infinite dynamic board");
+  }
   forEachCell(radius, (coord) => cells.push(coord));
   return cells;
 }
 
-/** Total number of cells in a hex board of given radius */
 export function cellCount(radius: number): number {
   return 3 * radius * (radius + 1) + 1;
 }
@@ -169,21 +146,18 @@ export function cellCount(radius: number): number {
 // Pixel Conversion (flat-top hexagons)
 // ---------------------------------------------------------------------------
 
-/** Convert axial coordinate to pixel position (flat-top hexagons) */
 export function axialToPixel(coord: AxialCoord, hexSize: number): { x: number; y: number } {
   const x = hexSize * (1.5 * coord.q);
   const y = hexSize * ((Math.sqrt(3) / 2) * coord.q + Math.sqrt(3) * coord.r);
   return { x, y };
 }
 
-/** Convert pixel position to axial coordinate (with rounding) */
 export function pixelToAxial(point: { x: number; y: number }, hexSize: number): AxialCoord {
   const q = ((2 / 3) * point.x) / hexSize;
   const r = ((-1 / 3) * point.x + (Math.sqrt(3) / 3) * point.y) / hexSize;
   return hexRound({ q, r, s: -q - r });
 }
 
-/** Round a fractional cube coordinate to the nearest hex cell */
 export function hexRound(frac: CubeCoord): AxialCoord {
   let rq = Math.round(frac.q);
   let rr = Math.round(frac.r);
@@ -204,7 +178,6 @@ export function hexRound(frac: CubeCoord): AxialCoord {
   return { q: rq, r: rr };
 }
 
-/** Get the 6 corner points of a flat-top hexagon centered at (cx, cy) */
 export function hexCorners(
   center: { x: number; y: number },
   hexSize: number,
@@ -224,12 +197,10 @@ export function hexCorners(
 // Direction Helpers
 // ---------------------------------------------------------------------------
 
-/** Get the opposite direction index */
 export function oppositeDirection(dirIndex: number): number {
   return (dirIndex + 3) % 6;
 }
 
-/** Get the direction index from one cell to an adjacent cell, or -1 if not adjacent */
 export function getDirectionIndex(from: AxialCoord, to: AxialCoord): number {
   const dq = to.q - from.q;
   const dr = to.r - from.r;
@@ -245,20 +216,10 @@ export function getDirectionIndex(from: AxialCoord, to: AxialCoord): number {
 // Board Enumeration Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * For each of the 3 axes, get the two opposing direction indices.
- * Axis 0: q-axis (dirs 0, 3)
- * Axis 1: r-axis (dirs 1, 4)
- * Axis 2: s-axis (dirs 2, 5)
- */
 export function getAxisDirections(axisIndex: number): [number, number] {
   return [axisIndex, (axisIndex + 3) % 6];
 }
 
-/**
- * Walk from a cell in a direction for up to `maxSteps`, returning all cells
- * that are within the board and match the predicate.
- */
 export function walkDirection(
   start: AxialCoord,
   dirIndex: number,
@@ -268,7 +229,9 @@ export function walkDirection(
 ): AxialCoord[] {
   const dir = HEX_DIRECTIONS[dirIndex % 6];
   const result: AxialCoord[] = [];
-  for (let i = 1; i <= maxSteps; i++) {
+  const limit = Number.isFinite(maxSteps) ? maxSteps : 1000;
+
+  for (let i = 1; i <= limit; i++) {
     const cell: AxialCoord = { q: start.q + dir.q * i, r: start.r + dir.r * i };
     if (!isValidCell(cell, radius)) break;
     if (!predicate(cell)) break;
